@@ -30,7 +30,7 @@ async function verify() {
 
         console.log("\nContract resolution check (Rahul Sharma, period = 2026-03-01..2026-03-31):");
         const resolved = await client.query(
-            `SELECT c.id, c.start_date, c.end_date, c.wage, c.status
+            `SELECT c.id, c.start_date::text, c.end_date::text, c.wage, c.status
              FROM contracts c
              JOIN employees e ON e.id = c.employee_id
              WHERE e.employee_code = 'EMP-002'
