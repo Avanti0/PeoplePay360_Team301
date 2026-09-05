@@ -573,10 +573,36 @@ function handleMockRoutes(endpoint: string, method: string, body: any): any {
     }));
   }
 
+  if (endpoint.startsWith('/salary-structures/') && method === 'GET') {
+    const id = endpoint.split('/')[2];
+    const s = salaryStructuresStore.find((item) => String(item.id) === String(id));
+    if (s) {
+      return {
+        ...s,
+        rules: salaryRulesStore.filter((r) => String(r.salaryStructureId) === String(s.id)),
+      };
+    }
+    return salaryStructuresStore[0];
+  }
+
   if (endpoint === '/salary-structures' && method === 'POST') {
     const newStruct: SalaryStructure = { ...body, id: Date.now() };
     salaryStructuresStore.push(newStruct);
     return newStruct;
+  }
+
+  if (endpoint.startsWith('/salary-structures/') && method === 'PUT') {
+    const id = endpoint.split('/')[2];
+    salaryStructuresStore = salaryStructuresStore.map((s) =>
+      String(s.id) === String(id) ? { ...s, ...body } : s
+    );
+    return salaryStructuresStore.find((s) => String(s.id) === String(id));
+  }
+
+  if (endpoint.startsWith('/salary-structures/') && method === 'DELETE') {
+    const id = endpoint.split('/')[2];
+    salaryStructuresStore = salaryStructuresStore.filter((s) => String(s.id) !== String(id));
+    return { success: true };
   }
 
   if (endpoint === '/salary-rules' && method === 'GET') {
@@ -595,6 +621,12 @@ function handleMockRoutes(endpoint: string, method: string, body: any): any {
       String(r.id) === String(id) ? { ...r, ...body } : r
     );
     return salaryRulesStore.find((r) => String(r.id) === String(id));
+  }
+
+  if (endpoint.startsWith('/salary-rules/') && method === 'DELETE') {
+    const id = endpoint.split('/')[2];
+    salaryRulesStore = salaryRulesStore.filter((r) => String(r.id) !== String(id));
+    return { success: true };
   }
 
   // Payruns
@@ -912,15 +944,26 @@ export const api = {
 
   salaryStructures: {
     getAll: () => request<SalaryStructure[]>('/salary-structures'),
+    getById: (id: string | number) => request<SalaryStructure>(`/salary-structures/${id}`),
     create: (data: Partial<SalaryStructure>) =>
       request<SalaryStructure>('/salary-structures', {
         method: 'POST',
         body: JSON.stringify(camelToSnake(data)),
       }),
+    update: (id: string | number, data: Partial<SalaryStructure>) =>
+      request<SalaryStructure>(`/salary-structures/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(camelToSnake(data)),
+      }),
+    delete: (id: string | number) =>
+      request<{ success: boolean }>(`/salary-structures/${id}`, {
+        method: 'DELETE',
+      }),
   },
 
   salaryRules: {
     getAll: () => request<SalaryRule[]>('/salary-rules'),
+    getById: (id: string | number) => request<SalaryRule>(`/salary-rules/${id}`),
     create: (data: Partial<SalaryRule>) =>
       request<SalaryRule>('/salary-rules', {
         method: 'POST',
@@ -930,6 +973,10 @@ export const api = {
       request<SalaryRule>(`/salary-rules/${id}`, {
         method: 'PUT',
         body: JSON.stringify(camelToSnake(data)),
+      }),
+    delete: (id: string | number) =>
+      request<{ success: boolean }>(`/salary-rules/${id}`, {
+        method: 'DELETE',
       }),
   },
 
