@@ -3,40 +3,54 @@
 Owner: Maddi Soumya
 
 This folder is the complete data layer for PeoplePay360: schema,
-migration runner, demo seed data, and a verification script. It has
-zero external dependencies and zero cloud/network requirements -
-everything runs locally against a single SQLite file.
+migration runner, demo seed data, and a verification script, running
+against a local PostgreSQL server.
 
 ## Tech Stack
 
 | Concern              | Choice                                   | Why |
 |-----------------------|-------------------------------------------|-----|
-| Database engine       | SQLite                                     | Zero-config, file-based, fully offline/local - no server process, no cloud account, nothing to install to run the app or the demo. |
-| Driver                | Node's built-in [`node:sqlite`](https://nodejs.org/api/sqlite.html) (`DatabaseSync`) | Ships with Node.js itself (v22.5+) - no native/compiled npm dependency (avoids `node-gyp`/Visual Studio build issues seen with `better-sqlite3` on this machine), no `npm install` required at all. |
-| Schema definition     | Plain `schema.sql` (DDL)                   | Portable, reviewable, easy for feature/backend to read directly or re-run against their own copy. |
+| Database engine       | PostgreSQL (local server)                  | Full relational engine with native enum types, real numeric precision for money, arrays/JSON if ever needed, and a mature ecosystem the rest of the team (and most job/interview contexts) already knows. Runs entirely on your own machine - no cloud account required. |
+| Driver                | [`pg`](https://node-postgres.com/) (`node-postgres`) | The standard Node.js Postgres client. Pure JavaScript wire-protocol implementation - no native/compiled addon, so `npm install` never needs a C++ build toolchain. |
+| Schema definition     | Plain `schema.sql` (DDL)                   | Portable, reviewable, easy for feature/backend to read directly or re-run against their own copy. Uses native Postgres `ENUM` types, `TIMESTAMPTZ`, `DATE`, and `NUMERIC` for exact-precision money math. |
 | Seed data             | `seed.js` (programmatic inserts)           | Produces real, relational, dynamic demo records (not static JSON) so feature/backend and feature/frontend can develop against actual query results. |
+| Config                | `.env` (git-ignored) + `config.js`         | Standard `PGHOST`/`PGPORT`/`PGUSER`/`PGPASSWORD`/`PGDATABASE` env vars, so every teammate points at their own local Postgres install without touching code, and feature/backend can reuse the exact same env vars for its own connection pool. |
 
 ## Requirements
 
-- Node.js **v22.5.0 or later** (for `node:sqlite`). This machine has v24.
+- **PostgreSQL installed and running locally.** Download from
+  https://www.postgresql.org/download/ (Windows installer includes
+  pgAdmin). Any recent version (13+) works.
+- Node.js v18+ (only needed to run the scripts in this folder - the
+  `pg` package is pure JS, no native build tools required).
 
-No `npm install` is required - there are currently no external
-dependencies.
+## Setup
 
-## Usage
+1. Install PostgreSQL locally and make sure the server is running
+   (on Windows, the installer sets it up as a Windows service that
+   starts automatically).
+2. From this `database/` directory:
+   ```bash
+   npm install
+   ```
+3. Copy `.env.example` to `.env` and fill in your local Postgres
+   credentials (the defaults assume user `postgres` / password
+   `postgres` on `localhost:5432`, adjust to match what you set during
+   install):
+   ```bash
+   cp .env.example .env
+   ```
+4. Run the setup scripts:
+   ```bash
+   npm run migrate   # creates the "peoplepay360" database (if missing) and applies schema.sql
+   npm run seed       # inserts demo data (run after migrate)
+   npm run reset       # re-applies schema.sql (which drops+recreates everything) + seed in one step
+   npm run verify      # prints row counts and checks key business rules
+   ```
 
-From this `database/` directory:
-
-```bash
-npm run migrate   # creates data/peoplepay360.db and applies schema.sql
-npm run seed      # inserts demo data (run after migrate)
-npm run reset     # deletes the local db file, then migrate + seed in one step
-npm run verify    # prints row counts and checks key business rules
-```
-
-The database file lives at `database/data/peoplepay360.db` and is
-git-ignored - every developer/teammate generates their own local copy
-by running `npm run reset`.
+`.env` is git-ignored - every developer/teammate keeps their own local
+credentials there; only `.env.example` (a template with no real
+secrets) is committed.
 
 ## What's in the schema
 
@@ -62,8 +76,9 @@ Key business rules enforced at the database layer:
   never just "the employee's latest contract." Demonstrated by the
   seed data for `EMP-002` (Rahul Sharma), who has two contracts; see
   `verify.js` for the exact query.
-- **No overlapping active contracts**: enforced by
-  `trg_contracts_no_overlap_insert` / `_update` triggers.
+- **No overlapping active contracts**: enforced by the
+  `trg_contracts_no_overlap` trigger (backed by the
+  `prevent_overlapping_running_contracts()` PL/pgSQL function).
 - **No duplicate payslips per payrun**: `UNIQUE (payrun_id, employee_id)`
   on `payslips`.
 - **Leave balance**: `remaining = allocated_amount - taken_amount`,
@@ -72,9 +87,9 @@ Key business rules enforced at the database layer:
 
 ## For feature/backend (Avanti)
 
-- Point your API layer's DB client at `database/data/peoplepay360.db`
-  (or copy `config.js`'s `DB_PATH` resolution logic - it respects the
-  `PEOPLEPAY_DB_PATH` env var so tests can use a throwaway file).
+- Reuse the same `PGHOST`/`PGPORT`/`PGUSER`/`PGPASSWORD`/`PGDATABASE`
+  env vars (see `.env.example`) for your API layer's own connection
+  pool (`pg.Pool`) - no need to duplicate connection logic.
 - Run `npm run reset` any time you want a clean, known-good dataset.
 - All computed/derived payroll values in the seed data (gross,
   deductions, net) were hand-checked against the salary rule
@@ -84,7 +99,6 @@ Key business rules enforced at the database layer:
 ## For feature/frontend (Vyshnavi)
 
 - Until the API is ready, you can still see real data shapes by
-  running `npm run verify`, or by querying the `.db` file directly
-  with any SQLite browser (e.g. the `sqlite3` CLI or a VS Code SQLite
-  extension) - no need to fall back to hand-written mock JSON for
-  field names/shapes.
+  running `npm run verify`, or by connecting with any Postgres client
+  (pgAdmin, DBeaver, the `psql` CLI, or a VS Code Postgres extension) -
+  no need to fall back to hand-written mock JSON for field names/shapes.

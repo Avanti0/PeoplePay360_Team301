@@ -5,7 +5,7 @@
   "private": true,
   "main": "index.js",
   "engines": {
-    "node": ">=22.5.0"
+    "node": ">=18"
   },
   "scripts": {
     "migrate": "node migrate.js",
@@ -17,10 +17,12 @@
     "peoplepay360",
     "hr",
     "payroll",
-    "sqlite",
+    "postgresql",
     "database"
   ],
   "author": "Maddi Soumya",
   "license": "UNLICENSED",
-  "dependencies": {}
+  "dependencies": {
+    "pg": "^8.23.0"
+  }
 }

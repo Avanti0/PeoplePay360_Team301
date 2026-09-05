@@ -1,43 +1,54 @@
 # Tech Stack - feature/database (Maddi Soumya)
 
-Database Engine : SQLite (file-based, local, zero-config)
-Driver / Access : Node.js built-in `node:sqlite` module (DatabaseSync) - no
-                  external/native npm dependency required (Node >= 22.5.0)
-Schema          : Plain SQL DDL file (database/schema.sql), applied via a
-                  Node migration runner (database/migrate.js)
+Database Engine : PostgreSQL (local server install; not a cloud service)
+Driver / Access : node-postgres (`pg` npm package) - pure JavaScript
+                  wire-protocol client, no native/compiled dependency
+Schema          : Plain SQL DDL file (database/schema.sql) using native
+                  Postgres ENUM types, TIMESTAMPTZ/DATE, and NUMERIC for
+                  exact-precision money math. Applied via a Node
+                  migration runner (database/migrate.js), which also
+                  creates the target database if it does not exist yet.
 Seed Data       : Programmatic seed script (database/seed.js) generating
                   real relational demo records (not static JSON)
-Tooling scripts : database/reset.js (drop + migrate + seed), database/verify.js
-                  (row-count + business-rule sanity checks)
+Tooling scripts : database/reset.js (migrate + seed in one step),
+                  database/verify.js (row-count + business-rule sanity
+                  checks)
+Config          : .env (git-ignored, per-developer) + config.js, using
+                  standard PGHOST/PGPORT/PGUSER/PGPASSWORD/PGDATABASE
+                  environment variables
 
 Why this stack:
-- Fully offline/local - no database server process, no cloud account,
-  no internet connection needed to build, run, or demo the app.
-- Zero install friction - node:sqlite ships with Node.js itself, avoiding
-  native-build tooling issues (node-gyp/Visual Studio) hit with
-  better-sqlite3 on this machine.
-- Still a real, dynamic, queryable relational database (not static
-  JSON), satisfying the "use real-time/dynamic data sources" requirement.
+- Full relational database engine with native enum types, exact-numeric
+  money columns, and constraints/triggers enforced by the server itself.
+- Still fully local - runs on a PostgreSQL server installed on your own
+  machine, no cloud database account required.
+- No native build tooling needed to install the driver (pg is pure JS),
+  unlike better-sqlite3 which failed to build on this machine due to a
+  missing Visual Studio toolchain.
+- A real, dynamic, queryable relational database (not static JSON),
+  satisfying the "use real-time/dynamic data sources" requirement.
 - Portable schema.sql / seed.js that feature/backend (Avanti) can point
-  any Node-based API layer at directly, and feature/frontend (Vyshnavi)
-  can inspect with any SQLite browser while the API is being built.
+  any Node-based API layer at directly (reusing the same env vars), and
+  feature/frontend (Vyshnavi) can inspect with any Postgres client
+  (pgAdmin, DBeaver, psql) while the API is being built.
 
 Where things live:
   PeoplePay360_Team301/database/
     schema.sql   - full DDL: employees, departments, job positions,
                    working schedules, contracts (period-aware, with
-                   overlap-prevention triggers), attendance, time off
+                   overlap-prevention trigger), attendance, time off
                    types/allocations/requests, salary structures/rules,
                    payruns/payslips/payslip lines, payroll warnings,
                    roles/users (RBAC)
-    migrate.js   - applies schema.sql to database/data/peoplepay360.db
+    migrate.js   - creates the database (if missing) and applies schema.sql
     seed.js      - inserts demo data reproducing the README's worked
                    examples (contract resolution, leave balance flow)
-    reset.js     - one-shot: wipe local db file + migrate + seed
+    reset.js     - one-shot: migrate + seed
     verify.js    - prints row counts and checks key business rules
-    config.js    - central DB path configuration (PEOPLEPAY_DB_PATH env
-                   override supported)
+    config.js    - loads .env and centralizes PG connection config
+    .env.example - template for local Postgres connection credentials
     README.md    - setup + usage instructions for the rest of the team
 
-Local database file (git-ignored, generated per developer):
-    PeoplePay360_Team301/database/data/peoplepay360.db
+Prerequisite (not committed to the repo): a running local PostgreSQL
+server. Install from https://www.postgresql.org/download/ - any
+version 13+ works. See database/README.md for full setup steps.

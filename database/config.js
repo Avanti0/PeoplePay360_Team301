@@ -1,20 +1,50 @@
 /**
  * Central DB configuration for the PeoplePay360 database module.
  *
- * The database is a local SQLite file, accessed through Node's built-in
- * `node:sqlite` module (no native/compiled dependency, no network, no
- * cloud service required). This keeps the feature/database branch fully
- * offline/local to develop or demo the app, while still giving Avanti
- * (feature/backend) a real, dynamic, queryable, relational data source
- * instead of static JSON fixtures.
+ * The database is PostgreSQL, running as a local server. Connection
+ * details are read from environment variables (see .env.example),
+ * which lets every teammate point at their own local Postgres install
+ * without changing code, and lets feature/backend swap in its own
+ * connection pool using the exact same env vars.
  *
- * Override the file location with the PEOPLEPAY_DB_PATH env var if needed
- * (e.g. to point a test run at a throwaway database file).
+ * A minimal .env loader is included below (no `dotenv` dependency
+ * needed) so `node migrate.js` etc. work out of the box after copying
+ * .env.example to .env.
  */
+const fs = require("fs");
 const path = require("path");
 
-const DB_DIR = path.join(__dirname, "data");
-const DB_PATH = process.env.PEOPLEPAY_DB_PATH || path.join(DB_DIR, "peoplepay360.db");
+function loadDotEnv() {
+    const envPath = path.join(__dirname, ".env");
+    if (!fs.existsSync(envPath)) return;
+
+    for (const line of fs.readFileSync(envPath, "utf8").split(/\r?\n/)) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith("#")) continue;
+        const eq = trimmed.indexOf("=");
+        if (eq === -1) continue;
+        const key = trimmed.slice(0, eq).trim();
+        let value = trimmed.slice(eq + 1).trim();
+        if (
+            (value.startsWith('"') && value.endsWith('"')) ||
+            (value.startsWith("'") && value.endsWith("'"))
+        ) {
+            value = value.slice(1, -1);
+        }
+        if (!(key in process.env)) process.env[key] = value;
+    }
+}
+
+loadDotEnv();
+
+const PG_CONFIG = {
+    host: process.env.PGHOST || "localhost",
+    port: Number(process.env.PGPORT || 5432),
+    user: process.env.PGUSER || "postgres",
+    password: process.env.PGPASSWORD || "postgres",
+    database: process.env.PGDATABASE || "peoplepay360",
+};
+
 const SCHEMA_PATH = path.join(__dirname, "schema.sql");
 
-module.exports = { DB_DIR, DB_PATH, SCHEMA_PATH };
+module.exports = { PG_CONFIG, SCHEMA_PATH };
