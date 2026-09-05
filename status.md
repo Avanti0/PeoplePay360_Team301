@@ -6,28 +6,28 @@ This file lives on `main`. Update it every time you reach a meaningful commit po
 
 ## Tech Stack (Finalized)
 
-| Layer          | Technology                          |
-|----------------|-------------------------------------|
-| Backend        | Python + FastAPI                    |
-| Frontend       | React + TypeScript                  |
-| Database       | PostgreSQL                          |
-| API Style      | REST                                |
-| Authentication | JWT + Refresh Tokens                |
-| Authorization  | RBAC (5 roles)                      |
-| PDF Generation | reportlab                           |
-| Email          | TBD                                 |
-| Deployment     | Docker Compose                      |
-| Dev Environment| WSL 2 + Ubuntu + VS Code            |
+| Layer           | Technology                       |
+|-----------------|----------------------------------|
+| Backend         | Python + FastAPI                 |
+| Frontend        | React + TypeScript               |
+| Database        | PostgreSQL                       |
+| API Style       | REST                             |
+| Authentication  | JWT + Refresh Tokens             |
+| Authorization   | RBAC (5 roles)                   |
+| PDF Generation  | reportlab                        |
+| Email           | SMTP (smtplib)                   |
+| Deployment      | Docker Compose                   |
+| Dev Environment | WSL 2 + Ubuntu + VS Code         |
 
 ---
 
 ## Branches
 
-| Branch             | Owner                | Responsibility        |
-|--------------------|----------------------|-----------------------|
-| `feature/backend`  | Avanti Dharmapurikar | API + Business Logic  |
-| `feature/frontend` | T. Lakshmi Vyshnavi  | UI                    |
-| `feature/database` | Maddi Soumya         | Schema + Seed Data    |
+| Branch             | Owner                | Responsibility       |
+|--------------------|----------------------|----------------------|
+| `feature/backend`  | Avanti Dharmapurikar | API + Business Logic |
+| `feature/frontend` | T. Lakshmi Vyshnavi  | UI                   |
+| `feature/database` | Maddi Soumya         | Schema + Seed Data   |
 
 ---
 
@@ -37,66 +37,73 @@ This file lives on `main`. Update it every time you reach a meaningful commit po
 - **Frontend (TypeScript/React):** `camelCase`
 - **API routes:** `/api/v1/<resource>` (plural, snake_case)
 
+### Employee Name Fields
+- Backend/DB: `first_name` + `last_name` (two separate columns)
+- Full name constructed as: `f"{first_name} {last_name}"` wherever needed
+- Frontend: `firstName` + `lastName` (camelCase after conversion)
+
 ### Model / Table Names
 
-| Entity           | Table Name         |
-|------------------|--------------------|
-| Employee         | `employees`        |
-| Contract         | `contracts`        |
-| Working Schedule | `working_schedules`|
-| Schedule Line    | `schedule_lines`   |
-| Attendance       | `attendance`       |
-| Time Off Type    | `time_off_types`   |
-| Allocation       | `allocations`      |
-| Time Off Request | `time_off_requests`|
-| Salary Structure | `salary_structures`|
-| Salary Rule      | `salary_rules`     |
-| Payrun           | `payruns`          |
-| Payslip          | `payslips`         |
-| Payslip Line     | `payslip_lines`    |
-| User             | `users`            |
+| Entity           | Table Name          |
+|------------------|---------------------|
+| Employee         | `employees`         |
+| Contract         | `contracts`         |
+| Working Schedule | `working_schedules` |
+| Schedule Line    | `working_schedule_lines` |
+| Attendance       | `attendance`        |
+| Time Off Type    | `time_off_types`    |
+| Allocation       | `leave_allocations` |
+| Time Off Request | `time_off_requests` |
+| Salary Structure | `salary_structures` |
+| Salary Rule      | `salary_rules`      |
+| Payrun           | `payruns`           |
+| Payrun Employee  | `payrun_employees`  |
+| Payslip          | `payslips`          |
+| Payslip Line     | `payslip_lines`     |
+| Payroll Warning  | `payroll_warnings`  |
+| User             | `users`             |
 
 ### Key Field Names
 
-| Field              | Agreed Name         |
-|--------------------|---------------------|
-| Primary key        | `id`                |
-| Employee FK        | `employee_id`       |
-| Contract start     | `date_start`        |
-| Contract end       | `date_end`          |
-| Payrun period from | `period_start`      |
-| Payrun period to   | `period_end`        |
-| Net salary         | `net_salary`        |
-| Gross salary       | `gross_salary`      |
-| Created timestamp  | `created_at`        |
-| Updated timestamp  | `updated_at`        |
+| Field              | Agreed Name     |
+|--------------------|-----------------|
+| Primary key        | `id`            |
+| Employee FK        | `employee_id`   |
+| Contract start     | `start_date`    |
+| Contract end       | `end_date`      |
+| Payrun period from | `period_start`  |
+| Payrun period to   | `period_end`    |
+| Net salary         | `net_salary`    |
+| Gross salary       | `gross_salary`  |
+| Created timestamp  | `created_at`    |
+| Updated timestamp  | `updated_at`    |
 
 ### Status Enums
 
-| Entity   | Values                                      |
-|----------|---------------------------------------------|
-| Contract | `draft`, `active`, `expired`, `cancelled`   |
-| Payrun   | `draft`, `computed`, `validated`, `paid`    |
-| Payslip  | `draft`, `computed`, `validated`, `paid`    |
-| Leave    | `draft`, `confirmed`, `approved`, `refused` |
-| Allocation | `draft`, `confirmed`, `approved`, `refused` |
+| Entity     | Values                                       |
+|------------|----------------------------------------------|
+| Contract   | `draft`, `running`, `expired`, `cancelled`   |
+| Payrun     | `draft`, `computed`, `validated`, `paid`     |
+| Payslip    | `draft`, `computed`, `validated`, `paid`     |
+| Leave      | `submitted`, `approved`, `refused`           |
+| Allocation | `draft`, `confirmed`, `approved`, `refused`  |
 
 ---
 
 ## Module Progress
 
-| Module                  | Database         | Backend          | Frontend         |
-|-------------------------|------------------|------------------|------------------|
-| Employee Management     | ⬜ Not started   | ⬜ Not started   | ⬜ Not started   |
-| Contract Management     | ⬜ Not started   | ⬜ Not started   | ⬜ Not started   |
-| Working Schedules       | ⬜ Not started   | ⬜ Not started   | ⬜ Not started   |
-| Attendance              | ⬜ Not started   | ⬜ Not started   | ⬜ Not started   |
-| Time Off                | ⬜ Not started   | ⬜ Not started   | ⬜ Not started   |
-| Salary Structures/Rules | ⬜ Not started   | ⬜ Not started   | ⬜ Not started   |
-| Payrun Processing       | ⬜ Not started   | ⬜ Not started   | ⬜ Not started   |
-| Payslip Generation      | ⬜ Not started   | ⬜ Not started   | ⬜ Not started   |
-| Payroll Dashboard       | ⬜ Not started   | ⬜ Not started   | ⬜ Not started   |
-| Auth / RBAC             | ⬜ Not started   | ✅ Done          | ⬜ Not started   |
+| Module                  | Database       | Backend        | Frontend       |
+|-------------------------|----------------|----------------|----------------|
+| Employee Management     | ✅ Done        | ✅ Done        | ✅ Done        |
+| Contract Management     | ✅ Done        | ✅ Done        | ✅ Done        |
+| Working Schedules       | ✅ Done        | ✅ Done        | ✅ Done        |
+| Attendance              | ✅ Done        | ✅ Done        | ✅ Done        |
+| Time Off                | ✅ Done        | ✅ Done        | ✅ Done        |
+| Salary Structures/Rules | ✅ Done        | ✅ Done        | ✅ Done        |
+| Payrun Processing       | ✅ Done        | ✅ Done        | ✅ Done        |
+| Payslip Generation      | ✅ Done        | ✅ Done        | ✅ Done        |
+| Payroll Dashboard       | ✅ Done        | ✅ Done        | ✅ Done        |
+| Auth / RBAC             | ✅ Done        | ✅ Done        | ✅ Done        |
 
 Status key: ⬜ Not started | 🔄 In progress | ✅ Done | 🔀 Merged to main
 
@@ -104,25 +111,27 @@ Status key: ⬜ Not started | 🔄 In progress | ✅ Done | 🔀 Merged to main
 
 ## Merge Log
 
-| Date | Branch | Merged by | What was merged |
-|------|--------|-----------|-----------------|
-| 2026-09-05 | feature/backend | Avanti | Backend scaffold: FastAPI structure, JWT auth, RBAC, User model |
+| Date       | Branch             | Merged by            | What was merged |
+|------------|--------------------|----------------------|-----------------|
+| 2026-09-05 | `feature/database` | Maddi Soumya         | Full schema.sql + seed.sql (all tables, constraints, triggers, demo data) |
+| 2026-09-05 | `feature/frontend` | T. Lakshmi Vyshnavi  | Full React app: all pages, routing, RBAC auth, mock fallback, api.ts wired to all endpoints |
+| 2026-09-05 | `feature/backend`  | Avanti Dharmapurikar | FastAPI scaffold, JWT auth, RBAC, all module APIs, payrun engine, salary rule execution, PDF, email, dashboard |
 
 ---
 
 ## Open Decisions / Blockers
 
-| # | Raised by | Question / Blocker              | Status |
-|---|-----------|---------------------------------|--------|
-| 1 |           | PDF library choice (TBD)        | Open   |
-| 2 |           | Email service choice (TBD)      | Open   |
+| # | Raised by | Question / Blocker | Status |
+|---|-----------|--------------------|--------|
+| 1 | Avanti | Login in api.ts sends JSON but FastAPI OAuth2 needs form-urlencoded — fix before integration test | Open |
+| 2 | All | docker-compose.yml not created yet — needed before end-to-end testing | Open |
 
 ---
 
 ## How to Update This File
 
 When you reach a meaningful commit:
-1. Update **Module Progress** rows for what you completed
-2. Finalize any **TBD** entries in Tech Stack or Naming
+1. Update **Module Progress** rows
+2. Finalize any TBDs in Tech Stack or Naming
 3. Add a row to **Merge Log** when merging to main
 4. Commit alongside your code: `git commit -m "status: <what changed>"`
