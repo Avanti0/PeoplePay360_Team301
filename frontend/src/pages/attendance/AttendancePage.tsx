@@ -252,6 +252,11 @@ export const AttendancePage: React.FC = () => {
                   </td>
                   <td className="py-3 px-4 font-semibold text-slate-800">
                     {r.checkIn ? new Date(r.checkIn).toLocaleDateString() : '-'}
+                    {r.expectedWorkingDay === false && (
+                      <span className="ml-1.5 text-[10px] font-semibold text-amber-600 bg-amber-50 border border-amber-200 rounded px-1 py-0.5 align-middle">
+                        Off-schedule
+                      </span>
+                    )}
                   </td>
                   <td className="py-3 px-4 text-slate-600">
                     {r.checkIn ? (

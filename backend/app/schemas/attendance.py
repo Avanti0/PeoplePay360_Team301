@@ -31,12 +31,14 @@ class AttendanceUpdate(BaseModel):
 class AttendanceOut(BaseModel):
     id: UUID
     employee_id: UUID
+    employee_name: Optional[str] = None
     check_in: Optional[datetime] = None
     check_out: Optional[datetime] = None
     worked_hours: Optional[Decimal] = None
     status: AttendanceStatus
     is_manual: bool
     note: Optional[str] = None
+    expected_working_day: Optional[bool] = None
     created_at: datetime
     updated_at: datetime
 

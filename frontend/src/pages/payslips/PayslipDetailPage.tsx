@@ -127,7 +127,7 @@ export const PayslipDetailPage: React.FC = () => {
             <span className="font-bold text-slate-900 text-sm mt-0.5 block">
               {payslip.employeeName}
             </span>
-            
+
           </div>
 
           <div>
@@ -157,9 +157,13 @@ export const PayslipDetailPage: React.FC = () => {
               Payable Days
             </span>
             <span className="font-bold text-slate-900 text-sm mt-0.5 block">
-              {payslip.workedDays || 22} Days
+              {payslip.workedDays ?? 0} Days
             </span>
-            <span className="text-[11px] text-emerald-600 font-semibold">Standard Shift</span>
+            <span className="text-[11px] text-emerald-600 font-semibold">
+              {payslip.expectedWorkingDays != null
+                ? `of ${payslip.expectedWorkingDays} expected per schedule`
+                : 'No schedule assigned'}
+            </span>
           </div>
         </div>
 

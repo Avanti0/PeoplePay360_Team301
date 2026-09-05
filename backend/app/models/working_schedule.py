@@ -1,3 +1,5 @@
+from datetime import date, timedelta
+from typing import Optional
 from sqlalchemy import (
     Column, Text, Boolean, SmallInteger, Integer, Time,
     TIMESTAMP, ForeignKey, UniqueConstraint, CheckConstraint, func, text,
@@ -36,3 +38,33 @@ class ScheduleLine(Base):
     break_minutes  = Column(Integer, nullable=False, server_default="0")
 
     schedule = relationship("WorkingSchedule", back_populates="lines")
+
+
+def is_expected_working_day(schedule: Optional["WorkingSchedule"], weekday: int) -> Optional[bool]:
+    """Does `schedule` mark `weekday` (0=Mon..6=Sun, matching ScheduleLine.day_of_week
+    and Python's date.weekday()) as a working day? None if there's no assigned schedule
+    or no line for that day, so callers can distinguish "off day" from "not tracked"."""
+    if schedule is None:
+        return None
+    for line in schedule.lines:
+        if line.day_of_week == weekday:
+            return line.is_working_day
+    return None
+
+
+def count_expected_working_days(schedule: Optional["WorkingSchedule"], period_start: date, period_end: date) -> Optional[int]:
+    """How many days in [period_start, period_end] are working days per `schedule`.
+    Purely informational — used to give payroll/attendance context alongside actual
+    worked days, never to alter salary-rule computation."""
+    if schedule is None or period_start is None or period_end is None:
+        return None
+    working_weekdays = {line.day_of_week for line in schedule.lines if line.is_working_day}
+    if not working_weekdays:
+        return 0
+    count = 0
+    current = period_start
+    while current <= period_end:
+        if current.weekday() in working_weekdays:
+            count += 1
+        current += timedelta(days=1)
+    return count

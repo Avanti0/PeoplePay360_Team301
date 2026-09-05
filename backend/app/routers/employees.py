@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.core.dependencies import require_hr_manager, require_admin, require_hr_manager_or_self
-from app.schemas.employee import EmployeeCreate, EmployeeUpdate, EmployeeOut, EmploymentStatus
+from app.schemas.employee import EmployeeCreate, EmployeeUpdate, EmployeeOut, EmployeePage, EmploymentStatus
 from app.schemas.contract import ContractOut
 from app.schemas.attendance import AttendanceOut
 from app.schemas.time_off import TimeOffRequestOut
@@ -13,15 +13,47 @@ from app.services import employee_service, contract_service, attendance_service,
 
 router = APIRouter(prefix="/api/v1/employees", tags=["employees"])
 
+ALLOWED_LIMITS = {10, 25, 50, 100}
+DEFAULT_LIMIT = 10
 
-@router.get("", response_model=List[EmployeeOut], dependencies=[Depends(require_hr_manager)])
+
+@router.get("", response_model=EmployeePage, dependencies=[Depends(require_hr_manager)])
 def list_employees(
     department: Optional[str] = Query(None),
     employment_status: Optional[EmploymentStatus] = Query(None),
+    status: Optional[str] = Query(None, description="active | inactive | all (alias used by frontend)"),
+    search: Optional[str] = Query(None, description="matches employee name or email"),
+    page: int = Query(1),
+    limit: int = Query(DEFAULT_LIMIT),
     db: Session = Depends(get_db),
 ):
-    status_value = employment_status.value if employment_status else None
-    return employee_service.list_employees(db, department=department, employment_status=status_value)
+    # Resolve effective employment_status filter
+    # `status` param (active/inactive/all) takes precedence over `employment_status`
+    if status is not None:
+        if status == "all":
+            effective_status = None
+        elif status in ("active", "inactive", "on_leave"):
+            effective_status = status
+        else:
+            effective_status = "active"  # invalid → default
+    elif employment_status is not None:
+        effective_status = employment_status.value
+    else:
+        # Default: active only
+        effective_status = "active"
+
+    # Sanitise limit
+    if limit not in ALLOWED_LIMITS:
+        limit = DEFAULT_LIMIT
+
+    return employee_service.list_employees(
+        db,
+        department=department,
+        employment_status=effective_status,
+        search=search,
+        page=page,
+        limit=limit,
+    )
 
 
 @router.post("", response_model=EmployeeOut, dependencies=[Depends(require_hr_manager)])

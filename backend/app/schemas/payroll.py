@@ -131,6 +131,7 @@ class PayslipOut(BaseModel):
     period_start: date
     period_end: date
     worked_days: Decimal
+    expected_working_days: Optional[int] = None
     gross_salary: Decimal
     net_salary: Decimal
     status: PayslipStatus

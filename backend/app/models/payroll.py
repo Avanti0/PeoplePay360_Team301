@@ -1,3 +1,4 @@
+from typing import Optional
 from sqlalchemy import (
     Column, Text, Boolean, Integer, Numeric, Date, TIMESTAMP,
     ForeignKey, UniqueConstraint, CheckConstraint, func, text,
@@ -9,6 +10,7 @@ from app.models.enums import (
     salary_rule_category_enum, computation_type_enum,
     payrun_status_enum, payslip_status_enum,
 )
+from app.models.working_schedule import count_expected_working_days
 
 
 class SalaryStructure(Base):
@@ -102,6 +104,15 @@ class Payslip(Base):
         "PayslipLine", back_populates="payslip",
         cascade="all, delete-orphan", order_by="PayslipLine.sequence",
     )
+
+    @property
+    def expected_working_days(self) -> Optional[int]:
+        """Working days per the employee's assigned schedule within this
+        payslip's period — informational context alongside worked_days,
+        computed on read and never fed into gross/net salary math."""
+        if self.employee is None:
+            return None
+        return count_expected_working_days(self.employee.working_schedule, self.period_start, self.period_end)
 
 
 class PayslipLine(Base):

@@ -61,6 +61,7 @@ class ContractUpdate(BaseModel):
 class ContractOut(BaseModel):
     id: UUID
     employee_id: UUID
+    employee_name: Optional[str] = None
     date_start: date
     date_end: Optional[date] = None
     wage: Decimal

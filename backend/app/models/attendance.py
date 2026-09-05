@@ -1,8 +1,10 @@
+from typing import Optional
 from sqlalchemy import Column, TIMESTAMP, Numeric, Boolean, Text, ForeignKey, func, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from app.db.session import Base
 from app.models.enums import attendance_status_enum
+from app.models.working_schedule import is_expected_working_day
 
 
 class Attendance(Base):
@@ -20,3 +22,15 @@ class Attendance(Base):
     updated_at    = Column(TIMESTAMP(timezone=True), nullable=False, server_default=func.now())
 
     employee = relationship("Employee", back_populates="attendance_records", foreign_keys=[employee_id])
+
+    @property
+    def employee_name(self) -> Optional[str]:
+        return self.employee.name if self.employee else None
+
+    @property
+    def expected_working_day(self) -> Optional[bool]:
+        """Whether check_in's weekday is a working day per the employee's
+        assigned schedule — None if there's no check_in or no schedule assigned."""
+        if self.check_in is None or self.employee is None:
+            return None
+        return is_expected_working_day(self.employee.working_schedule, self.check_in.weekday())

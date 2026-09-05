@@ -1,6 +1,6 @@
 from datetime import datetime
 from enum import Enum
-from typing import Optional
+from typing import List, Optional
 from uuid import UUID
 from pydantic import BaseModel, EmailStr, ConfigDict
 
@@ -50,6 +50,7 @@ class EmployeeOut(BaseModel):
     job_position: Optional[str] = None
     manager_id: Optional[UUID] = None
     working_schedule_id: Optional[UUID] = None
+    working_schedule_name: Optional[str] = None
     employment_status: EmploymentStatus
     bank_account_number: Optional[str] = None
     bank_name: Optional[str] = None
@@ -58,3 +59,11 @@ class EmployeeOut(BaseModel):
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class EmployeePage(BaseModel):
+    items: List[EmployeeOut]
+    total: int
+    page: int
+    limit: int
+    total_pages: int

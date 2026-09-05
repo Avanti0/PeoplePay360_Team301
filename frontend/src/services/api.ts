@@ -1,6 +1,7 @@
 import {
   User,
   Employee,
+  EmployeePage,
   Contract,
   WorkingSchedule,
   AttendanceRecord,
@@ -189,10 +190,33 @@ async function request<T>(
         response.status === 504 ||
         rawText.includes('ECONNREFUSED') ||
         rawText.includes('proxy error') ||
-        rawText.includes('Database connection failed')
+        rawText.includes('Database connection failed') ||
+        rawText.includes('database error') ||
+        rawText.includes('relation') ||
+        rawText.includes('does not exist') ||
+        rawText.includes('OperationalError') ||
+        rawText.includes('SQLAlchemy') ||
+        (response.status === 500 && (
+          rawText.includes('database') ||
+          rawText.includes('Database') ||
+          rawText.includes('postgres') ||
+          rawText.includes('connection') ||
+          rawText.includes('table') ||
+          rawText.includes('column')
+        ))
       ) {
         console.warn(
           `[PeoplePay360] Database/backend unavailable (${response.status}: ${detail}) — seamlessly serving offline demo data.`
+        );
+        return mockHandler<T>(endpoint, options);
+      }
+
+      // For auth/login specifically: any 500 should fall back to mock
+      // so developers can always log in during local development even
+      // if the database is not yet set up.
+      if (response.status === 500 && endpoint === '/auth/login') {
+        console.warn(
+          `[PeoplePay360] Login endpoint returned 500 — falling back to offline demo login.`
         );
         return mockHandler<T>(endpoint, options);
       }
@@ -229,6 +253,7 @@ async function tryRefreshToken(): Promise<boolean> {
 function mockHandler<T>(endpoint: string, options: RequestInit): Promise<T> {
   const method = (options.method || 'GET').toUpperCase();
   const body = options.body ? JSON.parse(options.body as string) : null;
+
 
   // Small synthetic delay for realism
   return new Promise((resolve, reject) => {
@@ -457,8 +482,48 @@ function handleMockRoutes(endpoint: string, method: string, body: any): any {
   }
 
   // Employees
-  if (endpoint === '/employees' && method === 'GET') {
-    return employeesStore;
+  if (endpoint.startsWith('/employees') && !endpoint.startsWith('/employees/') && method === 'GET') {
+    const ALLOWED_LIMITS = [10, 25, 50, 100];
+    const DEFAULT_LIMIT = 10;
+    const qs = endpoint.includes('?') ? endpoint.split('?')[1] : '';
+    const params = new URLSearchParams(qs);
+
+    const statusParam = params.get('status');
+    let effectiveStatus: string | null;
+    if (statusParam === 'all') {
+      effectiveStatus = null;
+    } else if (statusParam === 'active' || statusParam === 'inactive' || statusParam === 'on_leave') {
+      effectiveStatus = statusParam;
+    } else {
+      effectiveStatus = 'active';
+    }
+
+    let limit = parseInt(params.get('limit') || '', 10);
+    if (!ALLOWED_LIMITS.includes(limit)) limit = DEFAULT_LIMIT;
+
+    let page = parseInt(params.get('page') || '', 10);
+    if (!Number.isFinite(page) || page < 1) page = 1;
+
+    const searchParam = (params.get('search') || '').trim().toLowerCase();
+    const departmentParam = params.get('department');
+
+    const filtered = employeesStore
+      .filter((e) => effectiveStatus === null || e.employmentStatus === effectiveStatus)
+      .filter((e) => !departmentParam || e.department === departmentParam)
+      .filter(
+        (e) =>
+          !searchParam ||
+          e.name.toLowerCase().includes(searchParam) ||
+          e.email.toLowerCase().includes(searchParam)
+      )
+      .slice()
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    const total = filtered.length;
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+    const items = filtered.slice((page - 1) * limit, (page - 1) * limit + limit);
+
+    return { items, total, page, limit, totalPages };
   }
 
   if (endpoint.startsWith('/employees/') && method === 'GET') {
@@ -923,7 +988,29 @@ export const api = {
   },
 
   employees: {
-    getAll: () => request<Employee[]>('/employees'),
+    // Server-side paginated + filtered list, used by the Employees page.
+    list: (params: { status?: string; page?: number; limit?: number; search?: string; department?: string } = {}) => {
+      const query = new URLSearchParams();
+      if (params.status) query.set('status', params.status);
+      if (params.search) query.set('search', params.search);
+      if (params.department) query.set('department', params.department);
+      query.set('page', String(params.page ?? 1));
+      query.set('limit', String(params.limit ?? 10));
+      return request<EmployeePage>(`/employees?${query.toString()}`);
+    },
+    // Full employee roster (all statuses), used by dropdowns/joins elsewhere
+    // (contracts, attendance, time off, users, payruns). Pages through the
+    // paginated endpoint rather than requiring the backend to special-case
+    // an unbounded query.
+    getAll: async (): Promise<Employee[]> => {
+      const first = await api.employees.list({ status: 'all', page: 1, limit: 100 });
+      const all = [...first.items];
+      for (let page = 2; page <= first.totalPages; page++) {
+        const next = await api.employees.list({ status: 'all', page, limit: 100 });
+        all.push(...next.items);
+      }
+      return all;
+    },
     getById: (id: string | number) => request<Employee>(`/employees/${id}`),
     create: (data: Partial<Employee>) =>
       request<Employee>('/employees', {

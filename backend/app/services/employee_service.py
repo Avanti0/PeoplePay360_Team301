@@ -1,8 +1,9 @@
 from typing import Optional
 from uuid import UUID
 from fastapi import HTTPException, status
+from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.models.employee import Employee
 from app.schemas.employee import EmployeeCreate, EmployeeUpdate
@@ -22,17 +23,39 @@ def list_employees(
     db: Session,
     department: Optional[str] = None,
     employment_status: Optional[str] = None,
-) -> list[Employee]:
-    query = db.query(Employee)
+    search: Optional[str] = None,
+    page: int = 1,
+    limit: Optional[int] = None,
+) -> dict:
+    query = db.query(Employee).options(joinedload(Employee.working_schedule))
     if department is not None:
         query = query.filter(Employee.department == department)
     if employment_status is not None:
         query = query.filter(Employee.employment_status == employment_status)
-    return query.order_by(Employee.name).all()
+    if search:
+        like = f"%{search}%"
+        query = query.filter(or_(Employee.name.ilike(like), Employee.email.ilike(like)))
+    query = query.order_by(Employee.name)
+
+    total = query.count()
+
+    if limit is None:
+        items = query.all()
+        return {"items": items, "total": total, "page": 1, "limit": total or 1, "total_pages": 1}
+
+    page = max(1, page)
+    total_pages = max(1, -(-total // limit))  # ceiling division
+    items = query.offset((page - 1) * limit).limit(limit).all()
+    return {"items": items, "total": total, "page": page, "limit": limit, "total_pages": total_pages}
 
 
 def get_employee(db: Session, employee_id: UUID) -> Employee:
-    employee = db.query(Employee).filter(Employee.id == employee_id).first()
+    employee = (
+        db.query(Employee)
+        .options(joinedload(Employee.working_schedule))
+        .filter(Employee.id == employee_id)
+        .first()
+    )
     if not employee:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Employee not found")
     return employee
