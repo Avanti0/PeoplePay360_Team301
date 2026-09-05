@@ -14,7 +14,7 @@ This file lives on `main`. Update it every time you reach a meaningful commit po
 | API Style      | REST                                |
 | Authentication | JWT + Refresh Tokens                |
 | Authorization  | RBAC (5 roles)                      |
-| PDF Generation | TBD                                 |
+| PDF Generation | reportlab                           |
 | Email          | TBD                                 |
 | Deployment     | Docker Compose                      |
 | Dev Environment| WSL 2 + Ubuntu + VS Code            |
@@ -96,7 +96,7 @@ This file lives on `main`. Update it every time you reach a meaningful commit po
 | Payrun Processing       | ⬜ Not started   | ⬜ Not started   | ⬜ Not started   |
 | Payslip Generation      | ⬜ Not started   | ⬜ Not started   | ⬜ Not started   |
 | Payroll Dashboard       | ⬜ Not started   | ⬜ Not started   | ⬜ Not started   |
-| Auth / RBAC             | ⬜ Not started   | ⬜ Not started   | ⬜ Not started   |
+| Auth / RBAC             | ⬜ Not started   | ✅ Done          | ⬜ Not started   |
 
 Status key: ⬜ Not started | 🔄 In progress | ✅ Done | 🔀 Merged to main
 
@@ -106,7 +106,7 @@ Status key: ⬜ Not started | 🔄 In progress | ✅ Done | 🔀 Merged to main
 
 | Date | Branch | Merged by | What was merged |
 |------|--------|-----------|-----------------|
-|      |        |           |                 |
+| 2026-09-05 | feature/backend | Avanti | Backend scaffold: FastAPI structure, JWT auth, RBAC, User model |
 
 ---
 
