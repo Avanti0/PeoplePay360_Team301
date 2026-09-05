@@ -42,11 +42,15 @@ async function verify() {
 
         console.log("\nLeave balance check (Rahul Sharma, Earned Leave):");
         const balance = await client.query(
-            `SELECT a.number_of_days, a.taken, a.remaining
+            `SELECT a.number_of_days,
+                    COALESCE(SUM(r.duration) FILTER (WHERE r.status = 'approved'), 0) AS taken,
+                    a.number_of_days - COALESCE(SUM(r.duration) FILTER (WHERE r.status = 'approved'), 0) AS remaining
              FROM allocations a
+             LEFT JOIN time_off_requests r ON r.allocation_id = a.id
              JOIN employees e ON e.id = a.employee_id
              JOIN time_off_types t ON t.id = a.time_off_type_id
-             WHERE e.email = 'rahul.sharma@peoplepay360.demo' AND t.name = 'Earned Leave'`
+             WHERE e.email = 'rahul.sharma@peoplepay360.demo' AND t.name = 'Earned Leave'
+             GROUP BY a.id, a.number_of_days`
         );
         console.table(balance.rows);
 

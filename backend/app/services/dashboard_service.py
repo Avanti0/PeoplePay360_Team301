@@ -122,8 +122,8 @@ def get_alerts(db: Session) -> list[dict]:
         for i, message in enumerate(ps.warnings or []):
             alerts.append({
                 "id": f"{ps.id}:{i}",
-                "payslip_id": ps.id,
-                "employee_id": emp.id,
+                "payslip_id": str(ps.id),
+                "employee_id": str(emp.id),
                 "employee_name": emp.name,
                 "warning_type": "payroll_warning",
                 "message": message,
