@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { api } from '../../services/api';
-import { Employee, Contract, AttendanceRecord, TimeOffRequest } from '../../types';
+import { Employee, Contract, AttendanceRecord, TimeOffRequest, Payslip } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { StatusBadge } from '../../components/common/StatusBadge';
@@ -16,9 +16,11 @@ import {
   FileSignature,
   Clock,
   CalendarCheck,
+  Receipt,
   UserX,
   UserCheck,
   ShieldAlert,
+  ChevronRight,
 } from 'lucide-react';
 
 export const EmployeeDetailPage: React.FC = () => {
@@ -31,7 +33,8 @@ export const EmployeeDetailPage: React.FC = () => {
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [timeOff, setTimeOff] = useState<TimeOffRequest[]>([]);
-  const [activeTab, setActiveTab] = useState<'overview' | 'contracts' | 'attendance' | 'timeOff'>('overview');
+  const [payslips, setPayslips] = useState<Payslip[]>([]);
+  const [activeTab, setActiveTab] = useState<'overview' | 'contracts' | 'attendance' | 'timeOff' | 'payslips'>('overview');
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -43,16 +46,18 @@ export const EmployeeDetailPage: React.FC = () => {
   const loadEmployeeDetails = async (empId: string) => {
     setIsLoading(true);
     try {
-      const [emp, contractList, attList, toList] = await Promise.all([
+      const [emp, contractList, attList, toList, allPayslips] = await Promise.all([
         api.employees.getById(empId),
         api.employees.getContracts(empId),
         api.employees.getAttendance(empId),
         api.employees.getTimeOff(empId),
+        api.payslips.getAll().catch(() => []),
       ]);
       setEmployee(emp);
       setContracts(contractList);
       setAttendance(attList);
       setTimeOff(toList);
+      setPayslips(allPayslips.filter((p) => String(p.employeeId) === String(empId)));
     } catch {
       error('Failed to load employee details');
     } finally {
@@ -222,6 +227,17 @@ export const EmployeeDetailPage: React.FC = () => {
         >
           <CalendarCheck className="w-4 h-4" />
           <span>Time Off ({timeOff.length})</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('payslips')}
+          className={`pb-3 px-4 flex items-center gap-2 border-b-2 transition-all ${
+            activeTab === 'payslips'
+              ? 'border-blue-600 text-blue-600'
+              : 'border-transparent text-slate-500 hover:text-slate-800'
+          }`}
+        >
+          <Receipt className="w-4 h-4" />
+          <span>Payslips ({payslips.length})</span>
         </button>
       </div>
 
@@ -416,6 +432,65 @@ export const EmployeeDetailPage: React.FC = () => {
                       <td className="py-2.5 px-4 text-slate-500 max-w-xs truncate">{req.reason || '-'}</td>
                       <td className="py-2.5 px-4">
                         <StatusBadge status={req.status} />
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Tab 5: Payslips */}
+      {activeTab === 'payslips' && (
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+          <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+            <h3 className="text-sm font-bold text-slate-900">Salary Payslips & Earnings History</h3>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-bold uppercase text-[10px]">
+                <tr>
+                  <th className="py-3 px-4">Payslip #</th>
+                  <th className="py-3 px-4">Period</th>
+                  <th className="py-3 px-4">Worked Days</th>
+                  <th className="py-3 px-4">Gross Salary</th>
+                  <th className="py-3 px-4">Deductions</th>
+                  <th className="py-3 px-4">Net Salary</th>
+                  <th className="py-3 px-4">Status</th>
+                  <th className="py-3 px-4 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {payslips.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="py-6 text-center text-slate-400">
+                      No payslips generated for this employee yet.
+                    </td>
+                  </tr>
+                ) : (
+                  payslips.map((slip) => (
+                    <tr key={slip.id} className="hover:bg-slate-50">
+                      <td className="py-2.5 px-4 font-mono font-bold text-blue-600">PS-{slip.id}</td>
+                      <td className="py-2.5 px-4 text-slate-600">
+                        {slip.periodStart} &rarr; {slip.periodEnd}
+                      </td>
+                      <td className="py-2.5 px-4 font-semibold text-slate-700">{slip.workedDays} Days</td>
+                      <td className="py-2.5 px-4 font-semibold text-emerald-700">{formatCurrency(slip.grossSalary)}</td>
+                      <td className="py-2.5 px-4 text-rose-600">{formatCurrency(slip.totalDeductions)}</td>
+                      <td className="py-2.5 px-4 font-bold text-slate-900">{formatCurrency(slip.netSalary)}</td>
+                      <td className="py-2.5 px-4">
+                        <StatusBadge status={slip.status} />
+                      </td>
+                      <td className="py-2.5 px-4 text-right">
+                        <Link
+                          to={`/payslips/${slip.id}`}
+                          className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 font-bold"
+                        >
+                          <span>View</span>
+                          <ChevronRight className="w-3.5 h-3.5" />
+                        </Link>
                       </td>
                     </tr>
                   ))
