@@ -13,7 +13,3 @@ export * from './ErrorState';
 export * from './PageHeader';
 export * from './StatusBadge';
 export * from './KpiCard';
-export * from './Tabs';
-export * from './Dropdown';
-export * from './Loader';
-export * from './Toast';

@@ -49,16 +49,16 @@ export const TimeOffPage: React.FC<TimeOffPageProps> = ({ defaultTab }) => {
   const [employees, setEmployees] = useState<Employee[]>([]);
 
   const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
-  const [reqEmployeeId, setReqEmployeeId] = useState<number>(2);
-  const [reqTypeId, setReqTypeId] = useState<number>(1);
+  const [reqEmployeeId, setReqEmployeeId] = useState<string>('2');
+  const [reqTypeId, setReqTypeId] = useState<string>('1');
   const [reqStart, setReqStart] = useState('2026-09-10');
   const [reqEnd, setReqEnd] = useState('2026-09-11');
   const [reqDuration, setReqDuration] = useState(2);
   const [reqReason, setReqReason] = useState('');
 
   const [isAllocModalOpen, setIsAllocModalOpen] = useState(false);
-  const [allocEmployeeId, setAllocEmployeeId] = useState<number>(2);
-  const [allocTypeId, setAllocTypeId] = useState<number>(1);
+  const [allocEmployeeId, setAllocEmployeeId] = useState<string>('2');
+  const [allocTypeId, setAllocTypeId] = useState<string>('1');
   const [allocDays, setAllocDays] = useState(20);
   const [allocFrom, setAllocFrom] = useState('2026-01-01');
   const [allocTo, setAllocTo] = useState('2026-12-31');
@@ -121,15 +121,13 @@ export const TimeOffPage: React.FC<TimeOffPageProps> = ({ defaultTab }) => {
       await api.timeOffRequests.create({
         employeeId: reqEmployeeId,
         employeeName: emp?.name,
-        employeeCode: emp?.employeeCode,
-        departmentName: emp?.departmentName,
         timeOffTypeId: reqTypeId,
         timeOffTypeName: lType?.name,
         allocationId: alloc?.id || null,
         dateFrom: reqStart,
         dateTo: reqEnd,
         duration: reqDuration,
-        reason: reqReason,
+        note: reqReason || null,
       });
       success('Time off request submitted.');
       setIsRequestModalOpen(false);
@@ -149,7 +147,6 @@ export const TimeOffPage: React.FC<TimeOffPageProps> = ({ defaultTab }) => {
       await api.allocations.create({
         employeeId: allocEmployeeId,
         employeeName: emp?.name,
-        employeeCode: emp?.employeeCode,
         timeOffTypeId: allocTypeId,
         timeOffTypeName: lType?.name,
         numberOfDays: allocDays,
@@ -255,13 +252,13 @@ export const TimeOffPage: React.FC<TimeOffPageProps> = ({ defaultTab }) => {
                     <td className="py-3 px-4">
                       <span className="font-bold text-slate-900">{req.duration}</span> days
                     </td>
-                    <td className="py-3 px-4 text-slate-500 max-w-xs truncate">{req.reason || '-'}</td>
+                    <td className="py-3 px-4 text-slate-500 max-w-xs truncate">{req.note || '-'}</td>
                     <td className="py-3 px-4">
                       <StatusBadge status={req.status} />
                     </td>
                     {hasRole('hr_manager') && (
                       <td className="py-3 px-4 text-right">
-                        {(req.status === 'submitted' || req.status === 'draft') ? (
+                        {(req.status === 'confirmed' || req.status === 'draft') ? (
                           <div className="inline-flex items-center gap-1.5">
                             <button
                               onClick={() => handleApprove(req.id)}
@@ -347,10 +344,6 @@ export const TimeOffPage: React.FC<TimeOffPageProps> = ({ defaultTab }) => {
                   <span>Requires Allocation Balance:</span>
                   <span className="font-bold">{t.requiresAllocation ? 'Yes' : 'No'}</span>
                 </p>
-                <p className="flex items-center justify-between">
-                  <span>Affects Payroll Calculation:</span>
-                  <span className="font-bold">{t.affectsPayroll ? 'Yes' : 'No'}</span>
-                </p>
               </div>
             </div>
           ))}
@@ -369,12 +362,12 @@ export const TimeOffPage: React.FC<TimeOffPageProps> = ({ defaultTab }) => {
             <label className="block text-xs font-bold text-slate-700 mb-1">Employee</label>
             <select
               value={reqEmployeeId}
-              onChange={(e) => setReqEmployeeId(Number(e.target.value))}
+              onChange={(e) => setReqEmployeeId(e.target.value)}
               className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
             >
               {employees.map((e) => (
                 <option key={e.id} value={e.id}>
-                  {e.firstName} {e.lastName} ({e.employeeCode})
+                  {e.name}
                 </option>
               ))}
             </select>
@@ -384,7 +377,7 @@ export const TimeOffPage: React.FC<TimeOffPageProps> = ({ defaultTab }) => {
             <label className="block text-xs font-bold text-slate-700 mb-1">Leave Type</label>
             <select
               value={reqTypeId}
-              onChange={(e) => setReqTypeId(Number(e.target.value))}
+              onChange={(e) => setReqTypeId(e.target.value)}
               className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
             >
               {leaveTypes.map((t) => (
@@ -473,12 +466,12 @@ export const TimeOffPage: React.FC<TimeOffPageProps> = ({ defaultTab }) => {
             <label className="block text-xs font-bold text-slate-700 mb-1">Employee</label>
             <select
               value={allocEmployeeId}
-              onChange={(e) => setAllocEmployeeId(Number(e.target.value))}
+              onChange={(e) => setAllocEmployeeId(e.target.value)}
               className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
             >
               {employees.map((e) => (
                 <option key={e.id} value={e.id}>
-                  {e.firstName} {e.lastName} ({e.employeeCode})
+                  {e.name}
                 </option>
               ))}
             </select>
@@ -488,7 +481,7 @@ export const TimeOffPage: React.FC<TimeOffPageProps> = ({ defaultTab }) => {
             <label className="block text-xs font-bold text-slate-700 mb-1">Leave Type</label>
             <select
               value={allocTypeId}
-              onChange={(e) => setAllocTypeId(Number(e.target.value))}
+              onChange={(e) => setAllocTypeId(e.target.value)}
               className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
             >
               {leaveTypes.map((t) => (

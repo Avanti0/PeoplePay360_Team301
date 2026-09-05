@@ -26,7 +26,6 @@ export const WorkingSchedulesPage: React.FC = () => {
 
   // Form state
   const [name, setName] = useState('');
-  const [scheduleType, setScheduleType] = useState<'full_time' | 'part_time' | 'shift'>('full_time');
   const [lines, setLines] = useState<WorkingScheduleLine[]>(
     DAYS.map((_, i) => ({
       dayOfWeek: i,
@@ -100,7 +99,6 @@ export const WorkingSchedulesPage: React.FC = () => {
     try {
       const created = await api.workingSchedules.create({
         name,
-        scheduleType,
         isActive: true,
         weeklyHours: totalWeekly,
         lines,
@@ -167,8 +165,6 @@ export const WorkingSchedulesPage: React.FC = () => {
                     </span>
                   </div>
                   <div className="flex items-center gap-3 mt-2 text-xs text-slate-500">
-                    <span className="capitalize">{sched.scheduleType.replace(/_/g, ' ')}</span>
-                    <span>&bull;</span>
                     <span className="flex items-center gap-1 text-emerald-600 font-medium">
                       <CheckCircle2 className="w-3.5 h-3.5" /> Active
                     </span>
@@ -187,9 +183,6 @@ export const WorkingSchedulesPage: React.FC = () => {
                 <div>
                   <div className="flex items-center gap-2">
                     <h3 className="text-lg font-bold text-slate-900">{selectedSchedule.name}</h3>
-                    <span className="text-xs font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-700 capitalize">
-                      {selectedSchedule.scheduleType.replace(/_/g, ' ')}
-                    </span>
                   </div>
                   <p className="text-xs text-slate-500 mt-0.5">
                     Standard weekly timetable pattern and daily break allowances
@@ -285,18 +278,6 @@ export const WorkingSchedulesPage: React.FC = () => {
                 className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
                 required
               />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Schedule Type</label>
-              <select
-                value={scheduleType}
-                onChange={(e) => setScheduleType(e.target.value as any)}
-                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
-              >
-                <option value="full_time">Full Time</option>
-                <option value="part_time">Part Time</option>
-                <option value="shift">Rotational Shift</option>
-              </select>
             </div>
           </div>
 
