@@ -1,27 +1,22 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
-import { RoleName } from '../../types';
 import {
   LogOut,
   Shield,
   ChevronDown,
-  UserCheck,
-  Check,
 } from 'lucide-react';
 
 export const UserMenu: React.FC = () => {
-  const { user, role, switchUserRole, logout } = useAuth();
+  const { user, role, logout } = useAuth();
   const { success } = useToast();
   const [isOpen, setIsOpen] = useState(false);
-  const [showRoleSelector, setShowRoleSelector] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         setIsOpen(false);
-        setShowRoleSelector(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -36,14 +31,6 @@ export const UserMenu: React.FC = () => {
   const displayName = user?.employeeName || user?.username || 'User';
   const displayRole = role ? role.replace(/_/g, ' ') : 'Employee';
   const initial = displayName.charAt(0).toUpperCase();
-
-  const rolesList: { id: RoleName; label: string; emp: string }[] = [
-    { id: 'admin', label: 'Admin', emp: 'System Admin (EMP-009)' },
-    { id: 'hr_payroll_manager', label: 'HR Payroll Manager', emp: 'Vikram Rao (EMP-004)' },
-    { id: 'hr_payroll_user', label: 'HR Payroll User', emp: 'Sneha Deshmukh (EMP-005)' },
-    { id: 'hr_manager', label: 'HR Manager', emp: 'Ananya Iyer (EMP-001)' },
-    { id: 'employee', label: 'Employee', emp: 'Rahul Sharma (EMP-002)' },
-  ];
 
   return (
     <div className="relative" ref={menuRef}>
@@ -86,45 +73,6 @@ export const UserMenu: React.FC = () => {
                 {displayRole}
               </span>
             </div>
-          </div>
-
-          {/* Menu items */}
-          <div className="py-1">
-            <button
-              onClick={() => setShowRoleSelector(!showRoleSelector)}
-              className="w-full px-4 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 hover:text-blue-600 flex items-center justify-between transition-colors font-medium"
-            >
-              <div className="flex items-center gap-2.5">
-                <UserCheck className="w-4 h-4 text-blue-500" />
-                <span>Switch Persona / Role</span>
-              </div>
-              <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${showRoleSelector ? 'rotate-180' : ''}`} />
-            </button>
-
-            {showRoleSelector && (
-              <div className="bg-slate-50 border-y border-slate-100 py-1 px-1 my-1">
-                {rolesList.map((r) => (
-                  <button
-                    key={r.id}
-                    onClick={() => {
-                      switchUserRole(r.id);
-                      setShowRoleSelector(false);
-                      setIsOpen(false);
-                      success(`Switched to persona: ${r.label}`);
-                    }}
-                    className={`w-full px-3 py-1.5 text-left text-xs rounded-lg flex items-center justify-between transition-colors ${
-                      role === r.id ? 'bg-blue-600 text-white font-bold' : 'text-slate-700 hover:bg-slate-200/60'
-                    }`}
-                  >
-                    <div>
-                      <p className="text-[11px] leading-tight">{r.label}</p>
-                      <p className={`text-[9px] leading-tight ${role === r.id ? 'text-blue-100' : 'text-slate-400'}`}>{r.emp}</p>
-                    </div>
-                    {role === r.id && <Check className="w-3.5 h-3.5 flex-shrink-0" />}
-                  </button>
-                ))}
-              </div>
-            )}
           </div>
 
           {/* Logout */}

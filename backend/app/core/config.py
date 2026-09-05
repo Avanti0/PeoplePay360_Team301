@@ -1,7 +1,12 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional
 
 class Settings(BaseSettings):
+    # email_service.py/pdf_service.py read SMTP_*/PDF_DIR straight from the
+    # environment via os.getenv() rather than through this class — ignore
+    # them here instead of duplicating them as unused fields.
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
     # Option 1: full URL (takes priority)
     DATABASE_URL: Optional[str] = None
 
@@ -21,8 +26,5 @@ class Settings(BaseSettings):
         if self.DATABASE_URL:
             return self.DATABASE_URL
         return f"postgresql://{self.PGUSER}:{self.PGPASSWORD}@{self.PGHOST}:{self.PGPORT}/{self.PGDATABASE}"
-
-    class Config:
-        env_file = ".env"
 
 settings = Settings()

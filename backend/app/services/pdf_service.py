@@ -56,9 +56,9 @@ def generate_payslip_pdf(db: Session, payslip_id: int) -> str:
     # Employee + period info
     period = f"{payslip.payrun.period_start} to {payslip.payrun.period_end}"
     info_data = [
-        ["Employee", f"{emp.first_name} {emp.last_name}", "Period", period],
-        ["Employee Code", emp.employee_code, "Status", payslip.status.upper()],
-        ["Email", emp.email, "Worked Days", str(payslip.worked_days)],
+        ["Employee", emp.name, "Period", period],
+        ["Status", payslip.status.upper(), "Worked Days", str(payslip.worked_days)],
+        ["Email", emp.email, "", ""],
     ]
     info_table = Table(info_data, colWidths=[35*mm, 65*mm, 30*mm, 50*mm])
     info_table.setStyle(TableStyle([
@@ -95,9 +95,10 @@ def generate_payslip_pdf(db: Session, payslip_id: int) -> str:
     elements.append(Spacer(1, 4*mm))
 
     # Summary
+    total_deductions = float(payslip.gross_salary) - float(payslip.net_salary)
     summary_data = [
         ["Gross Salary",     f"₹ {float(payslip.gross_salary):,.2f}"],
-        ["Total Deductions", f"₹ {float(payslip.total_deductions):,.2f}"],
+        ["Total Deductions", f"₹ {total_deductions:,.2f}"],
         ["Net Salary",       f"₹ {float(payslip.net_salary):,.2f}"],
     ]
     summary_table = Table(summary_data, colWidths=[140*mm, 40*mm])
@@ -121,9 +122,5 @@ def generate_payslip_pdf(db: Session, payslip_id: int) -> str:
 
     with open(filepath, "wb") as f:
         f.write(buf.getvalue())
-
-    # persist path
-    payslip.pdf_path = filepath
-    db.commit()
 
     return filepath

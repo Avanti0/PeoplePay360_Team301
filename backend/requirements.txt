@@ -6,6 +6,10 @@ pydantic[email]==2.7.1
 pydantic-settings==2.2.1
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
+# passlib 1.7.4 (last release, 2020) is incompatible with bcrypt>=4.1 (removed
+# __about__, and its stricter 72-byte check breaks passlib's own internal
+# self-test) - pin explicitly or pip resolves the newest bcrypt and login 500s.
+bcrypt==4.0.1
 python-multipart==0.0.9
 alembic==1.13.1
 reportlab==4.2.0

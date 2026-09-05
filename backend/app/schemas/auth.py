@@ -28,3 +28,16 @@ class UserOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+class UserMeOut(BaseModel):
+    id: UUID
+    username: str
+    role: UserRole
+    is_active: bool
+    employee_id: Optional[UUID] = None
+    employee_name: Optional[str] = None
+
+class LoginOut(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: UserMeOut

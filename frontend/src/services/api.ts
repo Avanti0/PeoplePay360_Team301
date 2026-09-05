@@ -129,41 +129,51 @@ async function request<T>(
     headers['Authorization'] = `Bearer ${inMemoryAccessToken}`;
   }
 
+  // Only a genuinely unreachable backend (network/connection failure) falls
+  // back to mock data — and it's logged loudly so that never gets mistaken
+  // for a real response. A reachable backend's own error responses (400s,
+  // 401s, 500s) must propagate as real errors, not get silently replaced
+  // with fake "success" data from the mock layer.
+  let response: Response;
   try {
-    const response = await fetch(`${API_BASE}${endpoint}`, {
+    response = await fetch(`${API_BASE}${endpoint}`, {
       ...options,
       headers,
       credentials: 'include', // for httpOnly refresh cookies
     });
-
-    if (response.status === 401 && endpoint !== '/auth/login') {
-      // Attempt refresh
-      const refreshed = await tryRefreshToken();
-      if (refreshed) {
-        headers['Authorization'] = `Bearer ${inMemoryAccessToken}`;
-        const retryRes = await fetch(`${API_BASE}${endpoint}`, {
-          ...options,
-          headers,
-          credentials: 'include',
-        });
-        if (retryRes.ok) {
-          const raw = await retryRes.json();
-          return snakeToCamel<T>(raw);
-        }
-      }
-    }
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    }
-
-    const raw = await response.json();
-    return snakeToCamel<T>(raw);
-  } catch (err) {
-    // Graceful fallback to mock data layer when backend server is not running
-    // This satisfies Rule 12 and ensures smooth demo and component testability
+  } catch (networkErr) {
+    console.warn(
+      `[PeoplePay360] Backend unreachable at ${API_BASE}${endpoint} — falling back to offline demo data.`,
+      networkErr
+    );
     return mockHandler<T>(endpoint, options);
   }
+
+  if (response.status === 401 && endpoint !== '/auth/login') {
+    const refreshed = await tryRefreshToken();
+    if (refreshed) {
+      headers['Authorization'] = `Bearer ${inMemoryAccessToken}`;
+      response = await fetch(`${API_BASE}${endpoint}`, {
+        ...options,
+        headers,
+        credentials: 'include',
+      });
+    }
+  }
+
+  if (!response.ok) {
+    let detail = response.statusText;
+    try {
+      const body = await response.json();
+      detail = body?.detail || detail;
+    } catch {
+      // response body wasn't JSON — keep statusText
+    }
+    throw new Error(`HTTP ${response.status}: ${detail}`);
+  }
+
+  const raw = await response.json();
+  return snakeToCamel<T>(raw);
 }
 
 async function tryRefreshToken(): Promise<boolean> {
@@ -226,7 +236,7 @@ function handleMockRoutes(endpoint: string, method: string, body: any): any {
     );
 
     const user: User = matchedUser || {
-      id: 99,
+      id: 'mock-user-99',
       username: body?.username || 'demo.user',
       role: (body?.role || 'employee') as RoleName,
       employeeName: 'Demo User',
@@ -251,6 +261,11 @@ function handleMockRoutes(endpoint: string, method: string, body: any): any {
         user: currentAuthUser,
       };
     }
+    throw new Error('Unauthenticated');
+  }
+
+  if (endpoint === '/auth/me' && method === 'GET') {
+    if (currentAuthUser) return currentAuthUser;
     throw new Error('Unauthenticated');
   }
 
@@ -779,9 +794,7 @@ export const api = {
       request<{ success: boolean }>('/auth/logout', {
         method: 'POST',
       }),
-    getMe: async (): Promise<User | null> => {
-      return currentAuthUser;
-    },
+    getMe: () => request<User>('/auth/me'),
   },
 
   employees: {

@@ -2,17 +2,15 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
-import { demoUsers } from '../../services/mockData';
-import { Shield, KeyRound, UserCheck, ArrowRight } from 'lucide-react';
-import { RoleName } from '../../types';
+import { Shield, KeyRound, ArrowRight } from 'lucide-react';
 
 export const LoginPage: React.FC = () => {
-  const { login, switchUserRole } = useAuth();
+  const { login } = useAuth();
   const { success, error } = useToast();
   const navigate = useNavigate();
 
-  const [username, setUsername] = useState('admin');
-  const [password, setPassword] = useState('admin123');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -27,12 +25,6 @@ export const LoginPage: React.FC = () => {
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const handleQuickLogin = (role: RoleName) => {
-    switchUserRole(role);
-    success(`Signed in as ${role.replace(/_/g, ' ').toUpperCase()}`);
-    navigate('/dashboard');
   };
 
   return (
@@ -90,36 +82,6 @@ export const LoginPage: React.FC = () => {
               <ArrowRight className="w-4 h-4" />
             </button>
           </form>
-
-          {/* Hackathon Quick Role Switcher */}
-          <div className="mt-8 pt-6 border-t border-slate-100">
-            <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">
-              <UserCheck className="w-4 h-4 text-blue-500" />
-              <span>Quick Login by Demo Persona</span>
-            </div>
-            <div className="grid grid-cols-1 gap-2">
-              {demoUsers.map((u) => (
-                <button
-                  key={u.role}
-                  type="button"
-                  onClick={() => handleQuickLogin(u.role)}
-                  className="flex items-center justify-between px-3.5 py-2 rounded-xl border border-slate-200 hover:border-blue-300 hover:bg-blue-50/50 text-left transition-all group"
-                >
-                  <div>
-                    <span className="text-xs font-bold text-slate-800 group-hover:text-blue-600">
-                      {u.employeeName}
-                    </span>
-                    <span className="text-[10px] text-slate-500 block capitalize">
-                      {u.role.replace(/_/g, ' ')}
-                    </span>
-                  </div>
-                  <span className="text-[10px] font-semibold text-blue-600 group-hover:translate-x-0.5 transition-transform">
-                    Enter &rarr;
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
         </div>
 
         {/* Security Notice */}
