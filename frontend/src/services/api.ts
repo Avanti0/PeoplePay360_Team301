@@ -741,11 +741,16 @@ function handleMockRoutes(endpoint: string, method: string, body: any): any {
 // ---------------------------------------------------------------------
 export const api = {
   auth: {
-    login: (credentials: { username: string; password?: string; role?: RoleName }) =>
-      request<{ accessToken: string; tokenType: string; user: User }>('/auth/login', {
+    login: (credentials: { username: string; password?: string; role?: RoleName }) => {
+      const form = new URLSearchParams();
+      form.append('username', credentials.username);
+      form.append('password', credentials.password || '');
+      return request<{ accessToken: string; tokenType: string; user: User }>('/auth/login', {
         method: 'POST',
-        body: JSON.stringify(camelToSnake(credentials)),
-      }),
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: form.toString(),
+      });
+    },
     refresh: () =>
       request<{ accessToken: string }>('/auth/refresh', {
         method: 'POST',
