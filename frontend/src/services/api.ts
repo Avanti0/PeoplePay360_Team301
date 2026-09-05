@@ -254,6 +254,7 @@ function mockHandler<T>(endpoint: string, options: RequestInit): Promise<T> {
   const method = (options.method || 'GET').toUpperCase();
   const body = options.body ? JSON.parse(options.body as string) : null;
 
+
   // Small synthetic delay for realism
   return new Promise((resolve, reject) => {
     setTimeout(() => {
