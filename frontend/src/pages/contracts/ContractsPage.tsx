@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { api } from '../../services/api';
 import { Contract, Employee, SalaryStructure, WorkingSchedule } from '../../types';
 import { useAuth } from '../../context/AuthContext';
@@ -171,16 +172,17 @@ export const ContractsPage: React.FC = () => {
                 <th className="py-3.5 px-4">Salary Structure</th>
                 <th className="py-3.5 px-4">Gross Wage</th>
                 <th className="py-3.5 px-4">Status</th>
+                <th className="py-3.5 px-4 text-right">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
               {filteredContracts.map((c) => (
                 <tr key={c.id} className="hover:bg-slate-50/80 transition-colors">
                   <td className="py-3 px-4">
-                    <div>
-                      <p className="font-bold text-slate-900">{c.employeeName}</p>
-                      <p className="text-[10px] text-slate-400">{c.employeeCode}</p>
-                    </div>
+                    <Link to={`/contracts/${c.id}`} className="group block">
+                      <p className="font-bold text-slate-900 group-hover:text-blue-600 transition-colors">{c.employeeName}</p>
+                      <p className="text-[10px] text-slate-400 font-mono">{c.employeeCode} &bull; #{c.id}</p>
+                    </Link>
                   </td>
                   <td className="py-3 px-4">
                     <p className="font-semibold text-slate-800">{c.jobPositionTitle || 'Software Engineer'}</p>
@@ -207,6 +209,15 @@ export const ContractsPage: React.FC = () => {
                   </td>
                   <td className="py-3 px-4">
                     <StatusBadge status={c.status} />
+                  </td>
+                  <td className="py-3 px-4 text-right">
+                    <Link
+                      to={`/contracts/${c.id}`}
+                      className="px-2.5 py-1 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-blue-600 text-xs font-semibold inline-flex items-center gap-1 transition-colors"
+                    >
+                      <span>View</span>
+                      <span>&rarr;</span>
+                    </Link>
                   </td>
                 </tr>
               ))}

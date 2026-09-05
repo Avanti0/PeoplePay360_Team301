@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../../services/api';
 import { TimeOffRequest, Allocation, TimeOffType, Employee } from '../../types';
 import { useAuth } from '../../context/AuthContext';
@@ -8,24 +8,40 @@ import { StatusBadge } from '../../components/common/StatusBadge';
 import { Modal } from '../../components/common/Modal';
 import { CalendarCheck, Plus, Check, X, Layers, PieChart } from 'lucide-react';
 
-export const TimeOffPage: React.FC = () => {
+interface TimeOffPageProps {
+  defaultTab?: 'requests' | 'allocations' | 'types';
+}
+
+export const TimeOffPage: React.FC<TimeOffPageProps> = ({ defaultTab }) => {
   const { hasRole } = useAuth();
   const { success, error, warning } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
+  const navigate = useNavigate();
 
-  const tabParam = searchParams.get('tab');
-  const initialTab = (tabParam === 'allocations' || tabParam === 'types') ? tabParam : 'requests';
-  const [activeTab, setActiveTab] = useState<'requests' | 'allocations' | 'types'>(initialTab);
+  const getActiveTabFromLocation = (): 'requests' | 'allocations' | 'types' => {
+    if (defaultTab) return defaultTab;
+    if (location.pathname.includes('/time-off/allocations')) return 'allocations';
+    if (location.pathname.includes('/time-off/types')) return 'types';
+    if (location.pathname.includes('/time-off/requests')) return 'requests';
+    const tabParam = searchParams.get('tab');
+    if (tabParam === 'allocations' || tabParam === 'types') return tabParam;
+    return 'requests';
+  };
+
+  const [activeTab, setActiveTab] = useState<'requests' | 'allocations' | 'types'>(getActiveTabFromLocation());
 
   useEffect(() => {
-    if (tabParam === 'requests' || tabParam === 'allocations' || tabParam === 'types') {
-      setActiveTab(tabParam);
-    }
-  }, [tabParam]);
+    setActiveTab(getActiveTabFromLocation());
+  }, [location.pathname, searchParams, defaultTab]);
 
   const handleTabChange = (tab: 'requests' | 'allocations' | 'types') => {
     setActiveTab(tab);
-    setSearchParams({ tab });
+    if (location.pathname.startsWith('/time-off/')) {
+      navigate(`/time-off/${tab}`);
+    } else {
+      setSearchParams({ tab });
+    }
   };
   const [requests, setRequests] = useState<TimeOffRequest[]>([]);
   const [allocations, setAllocations] = useState<Allocation[]>([]);
