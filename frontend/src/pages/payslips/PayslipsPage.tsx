@@ -43,7 +43,6 @@ export const PayslipsPage: React.FC = () => {
   const filteredPayslips = payslips.filter((slip) => {
     const matchesSearch =
       (slip.employeeName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (slip.employeeCode || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       (slip.payrunName || '').toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === 'all' || slip.status === statusFilter;
     return matchesSearch && matchesStatus;
@@ -124,7 +123,6 @@ export const PayslipsPage: React.FC = () => {
                 >
                   <td className="py-3.5 px-4">
                     <p className="font-bold text-slate-900">{slip.employeeName}</p>
-                    <p className="text-[10px] text-slate-400">{slip.employeeCode}</p>
                   </td>
                   <td className="py-3.5 px-4 text-slate-600 font-semibold">
                     {slip.payrunName || 'Regular Payrun'}
@@ -136,7 +134,7 @@ export const PayslipsPage: React.FC = () => {
                     {formatCurrency(slip.grossSalary)}
                   </td>
                   <td className="py-3.5 px-4 font-bold text-rose-600">
-                    {formatCurrency(slip.totalDeductions)}
+                    {formatCurrency(slip.grossSalary - slip.netSalary)}
                   </td>
                   <td className="py-3.5 px-4">
                     <span className="font-extrabold text-blue-600 text-sm">
