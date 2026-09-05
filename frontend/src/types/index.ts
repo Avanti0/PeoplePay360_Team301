@@ -144,6 +144,7 @@ export interface AttendanceRecord {
   status: AttendanceStatus;
   isManual: boolean;
   note?: string | null;
+  expectedWorkingDay?: boolean | null; // derived from the employee's assigned working schedule
   createdAt?: string;
   updatedAt?: string;
 }
@@ -254,6 +255,7 @@ export interface Payslip {
   periodStart: string;
   periodEnd: string;
   workedDays: number;
+  expectedWorkingDays?: number | null; // derived from the employee's assigned working schedule
   grossSalary: number;
   netSalary: number;
   status: PayslipStatus;

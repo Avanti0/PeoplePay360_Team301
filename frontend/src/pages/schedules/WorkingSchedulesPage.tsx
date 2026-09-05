@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { api } from '../../services/api';
-import { WorkingSchedule, WorkingScheduleLine } from '../../types';
+import { WorkingSchedule, WorkingScheduleLine, Employee } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { Modal } from '../../components/common/Modal';
@@ -11,6 +12,7 @@ import {
   CheckCircle2,
   Calendar,
   Layers,
+  Users,
 } from 'lucide-react';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -20,6 +22,7 @@ export const WorkingSchedulesPage: React.FC = () => {
   const { success, error } = useToast();
 
   const [schedules, setSchedules] = useState<WorkingSchedule[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
   const [selectedSchedule, setSelectedSchedule] = useState<WorkingSchedule | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -43,8 +46,12 @@ export const WorkingSchedulesPage: React.FC = () => {
   const loadSchedules = async () => {
     setIsLoading(true);
     try {
-      const data = await api.workingSchedules.getAll();
+      const [data, empData] = await Promise.all([
+        api.workingSchedules.getAll(),
+        api.employees.getAll(),
+      ]);
       setSchedules(data);
+      setEmployees(empData);
       if (data.length > 0 && !selectedSchedule) {
         setSelectedSchedule(data[0]);
       }
@@ -54,6 +61,9 @@ export const WorkingSchedulesPage: React.FC = () => {
       setIsLoading(false);
     }
   };
+
+  const assignedEmployees = (scheduleId: string) =>
+    employees.filter((emp) => String(emp.workingScheduleId) === String(scheduleId));
 
   const formatTime = (timeStr?: string | null) => {
     if (!timeStr) return '';
@@ -218,6 +228,9 @@ export const WorkingSchedulesPage: React.FC = () => {
                     <span className="flex items-center gap-1 text-emerald-600 font-medium">
                       <CheckCircle2 className="w-3.5 h-3.5" /> Active
                     </span>
+                    <span className="flex items-center gap-1">
+                      <Users className="w-3.5 h-3.5" /> {assignedEmployees(sched.id).length} assigned
+                    </span>
                   </div>
                 </div>
               );
@@ -297,6 +310,29 @@ export const WorkingSchedulesPage: React.FC = () => {
                     </div>
                   );
                 })}
+              </div>
+
+              {/* Assigned Employees (FR: Working Schedule <-> Employee integration) */}
+              <div className="pt-4 border-t border-slate-100">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3 flex items-center gap-1.5">
+                  <Users className="w-3.5 h-3.5" />
+                  Assigned Employees ({assignedEmployees(selectedSchedule.id).length})
+                </h4>
+                {assignedEmployees(selectedSchedule.id).length === 0 ? (
+                  <p className="text-xs text-slate-400">No employees are currently assigned to this schedule.</p>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {assignedEmployees(selectedSchedule.id).map((emp) => (
+                      <Link
+                        key={emp.id}
+                        to={`/employees/${emp.id}`}
+                        className="px-2.5 py-1 rounded-lg bg-slate-50 border border-slate-200 hover:border-blue-300 hover:bg-blue-50 text-xs font-semibold text-slate-700 hover:text-blue-700 transition-colors"
+                      >
+                        {emp.name}
+                      </Link>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           ) : (

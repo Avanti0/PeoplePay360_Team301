@@ -5,10 +5,11 @@ from uuid import UUID
 from fastapi import HTTPException, status
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.models.attendance import Attendance
 from app.models.employee import Employee
+from app.models.working_schedule import WorkingSchedule
 from app.schemas.attendance import AttendanceCreate, AttendanceUpdate
 
 
@@ -19,13 +20,21 @@ def _compute_worked_hours(check_in: Optional[datetime], check_out: Optional[date
     return Decimal(str(round(hours, 2)))
 
 
+def _with_employee_schedule(query):
+    """Eager-load employee -> working_schedule -> lines in one query so
+    Attendance.employee_name / expected_working_day don't trigger N+1 lookups."""
+    return query.options(
+        joinedload(Attendance.employee).joinedload(Employee.working_schedule).joinedload(WorkingSchedule.lines)
+    )
+
+
 def list_attendance(
     db: Session,
     employee_id: Optional[UUID] = None,
     date_from: Optional[date] = None,
     date_to: Optional[date] = None,
 ) -> list[Attendance]:
-    query = db.query(Attendance)
+    query = _with_employee_schedule(db.query(Attendance))
     if employee_id is not None:
         query = query.filter(Attendance.employee_id == employee_id)
     # attendance has no separate "work_date" column - the day is derived
@@ -38,7 +47,7 @@ def list_attendance(
 
 
 def get_attendance(db: Session, attendance_id: UUID) -> Attendance:
-    record = db.query(Attendance).filter(Attendance.id == attendance_id).first()
+    record = _with_employee_schedule(db.query(Attendance)).filter(Attendance.id == attendance_id).first()
     if not record:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Attendance record not found")
     return record

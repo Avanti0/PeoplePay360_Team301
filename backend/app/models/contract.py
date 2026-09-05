@@ -1,3 +1,4 @@
+from typing import Optional
 from sqlalchemy import Column, Text, Date, Numeric, TIMESTAMP, ForeignKey, CheckConstraint, func, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
@@ -28,3 +29,7 @@ class Contract(Base):
     working_schedule = relationship("WorkingSchedule", back_populates="contracts")
     salary_structure = relationship("SalaryStructure", back_populates="contracts")
     payslips         = relationship("Payslip", back_populates="contract")
+
+    @property
+    def employee_name(self) -> Optional[str]:
+        return self.employee.name if self.employee else None

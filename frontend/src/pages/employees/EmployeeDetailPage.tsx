@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../../services/api';
-import { Employee, Contract, AttendanceRecord, TimeOffRequest } from '../../types';
+import { Employee, Contract, AttendanceRecord, TimeOffRequest, WorkingSchedule } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { StatusBadge } from '../../components/common/StatusBadge';
@@ -19,7 +19,10 @@ import {
   UserX,
   UserCheck,
   ShieldAlert,
+  CalendarDays,
 } from 'lucide-react';
+
+const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
 export const EmployeeDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -31,6 +34,7 @@ export const EmployeeDetailPage: React.FC = () => {
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [timeOff, setTimeOff] = useState<TimeOffRequest[]>([]);
+  const [schedule, setSchedule] = useState<WorkingSchedule | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'contracts' | 'attendance' | 'timeOff'>('overview');
   const [isLoading, setIsLoading] = useState(true);
 
@@ -53,6 +57,19 @@ export const EmployeeDetailPage: React.FC = () => {
       setContracts(contractList);
       setAttendance(attList);
       setTimeOff(toList);
+
+      // The assigned working schedule is fetched separately, reusing the
+      // existing working-schedules endpoint rather than duplicating its
+      // day/hour data onto the employee record.
+      if (emp.workingScheduleId) {
+        try {
+          setSchedule(await api.workingSchedules.getById(emp.workingScheduleId));
+        } catch {
+          setSchedule(null);
+        }
+      } else {
+        setSchedule(null);
+      }
     } catch {
       error('Failed to load employee details');
     } finally {
@@ -242,7 +259,7 @@ export const EmployeeDetailPage: React.FC = () => {
               <div>
                 <span className="text-slate-400 block font-medium">Schedule</span>
                 <span className="font-bold text-slate-900 mt-0.5 block">
-                  {employee.workingScheduleName || 'Standard 9-to-6'}
+                  {employee.workingScheduleName || 'Not Assigned'}
                 </span>
               </div>
             </div>
@@ -272,6 +289,58 @@ export const EmployeeDetailPage: React.FC = () => {
                 </span>
               </div>
             </div>
+          </div>
+
+          {/* Assigned Working Schedule (FR: Employee -> Working Schedule integration) */}
+          <div className="md:col-span-2 bg-white rounded-2xl border border-slate-200/80 p-6 shadow-sm space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                Assigned Working Schedule
+              </h3>
+              {schedule && (
+                <span className="text-xs font-bold text-blue-700 bg-blue-100/70 px-2 py-0.5 rounded-full">
+                  {schedule.weeklyHours}h / wk
+                </span>
+              )}
+            </div>
+
+            {schedule ? (
+              <div className="space-y-3">
+                <p className="text-sm font-bold text-slate-900">{schedule.name}</p>
+                <div className="space-y-2">
+                  {DAYS.map((dayName, idx) => {
+                    const line = schedule.lines?.find((l) => l.dayOfWeek === idx);
+                    const isWorking = line?.isWorkingDay;
+                    return (
+                      <div
+                        key={dayName}
+                        className={`flex items-center justify-between px-3 py-2 rounded-lg text-xs ${
+                          isWorking ? 'bg-slate-50 border border-slate-100' : 'bg-slate-50/50 opacity-60'
+                        }`}
+                      >
+                        <span className="font-semibold text-slate-700 w-24">{dayName}</span>
+                        {isWorking ? (
+                          <div className="flex items-center gap-4 text-slate-600">
+                            <span className="flex items-center gap-1">
+                              <Clock className="w-3 h-3 text-slate-400" />
+                              {(line?.startTime || '').slice(0, 5)} &ndash; {(line?.endTime || '').slice(0, 5)}
+                            </span>
+                            <span>{line?.breakMinutes || 0}m break</span>
+                          </div>
+                        ) : (
+                          <span className="italic text-slate-400">Rest Day</span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              <div className="py-6 flex flex-col items-center justify-center text-slate-400">
+                <CalendarDays className="w-6 h-6 mb-2" />
+                <p className="text-xs font-medium">No working schedule assigned to this employee.</p>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -354,6 +423,11 @@ export const EmployeeDetailPage: React.FC = () => {
                     <tr key={att.id} className="hover:bg-slate-50">
                       <td className="py-2.5 px-4 font-bold text-slate-900">
                         {att.checkIn ? new Date(att.checkIn).toLocaleDateString() : '-'}
+                        {att.expectedWorkingDay === false && (
+                          <span className="ml-1.5 text-[10px] font-semibold text-amber-600 bg-amber-50 border border-amber-200 rounded px-1 py-0.5 align-middle">
+                            Off-schedule
+                          </span>
+                        )}
                       </td>
                       <td className="py-2.5 px-4 text-slate-600">
                         {att.checkIn ? new Date(att.checkIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}

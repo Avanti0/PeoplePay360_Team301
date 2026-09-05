@@ -4,7 +4,7 @@ from uuid import UUID
 from fastapi import HTTPException, status
 from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.models.contract import Contract
 from app.models.employee import Employee
@@ -38,7 +38,7 @@ def _validate_no_overlap(
 
 
 def list_contracts(db: Session, employee_id: Optional[UUID] = None, status_filter: Optional[str] = None) -> list[Contract]:
-    query = db.query(Contract)
+    query = db.query(Contract).options(joinedload(Contract.employee))
     if employee_id is not None:
         query = query.filter(Contract.employee_id == employee_id)
     if status_filter is not None:
@@ -47,7 +47,12 @@ def list_contracts(db: Session, employee_id: Optional[UUID] = None, status_filte
 
 
 def get_contract(db: Session, contract_id: UUID) -> Contract:
-    contract = db.query(Contract).filter(Contract.id == contract_id).first()
+    contract = (
+        db.query(Contract)
+        .options(joinedload(Contract.employee))
+        .filter(Contract.id == contract_id)
+        .first()
+    )
     if not contract:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contract not found")
     return contract

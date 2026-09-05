@@ -1,12 +1,13 @@
 from datetime import date, datetime, timezone
 from typing import Optional
 from fastapi import HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy.exc import IntegrityError
 
 from app.models.payroll import SalaryStructure, SalaryRule, Payrun, PayrunEmployee, Payslip, PayslipLine
 from app.models.employee import Employee
 from app.models.attendance import Attendance
+from app.models.working_schedule import WorkingSchedule
 from app.schemas.payroll import SalaryStructureCreate, SalaryStructureUpdate, SalaryRuleCreate, SalaryRuleUpdate, PayrunCreate
 from app.services.contract_service import resolve_contract_for_period
 
@@ -271,8 +272,15 @@ def mark_paid(db: Session, payrun_id) -> Payrun:
 
 # ── Payslips ──────────────────────────────────────────────────────────────────
 
+def _with_employee_schedule(query):
+    """Eager-load employee -> working_schedule -> lines so Payslip.expected_working_days
+    doesn't trigger N+1 lookups."""
+    return query.options(
+        joinedload(Payslip.employee).joinedload(Employee.working_schedule).joinedload(WorkingSchedule.lines)
+    )
+
 def list_payslips(db: Session, payrun_id=None, employee_id=None) -> list[Payslip]:
-    q = db.query(Payslip)
+    q = _with_employee_schedule(db.query(Payslip))
     if payrun_id:
         q = q.filter(Payslip.payrun_id == payrun_id)
     if employee_id:
@@ -280,7 +288,7 @@ def list_payslips(db: Session, payrun_id=None, employee_id=None) -> list[Payslip
     return q.all()
 
 def get_payslip(db: Session, payslip_id) -> Payslip:
-    obj = db.query(Payslip).filter(Payslip.id == payslip_id).first()
+    obj = _with_employee_schedule(db.query(Payslip)).filter(Payslip.id == payslip_id).first()
     if not obj:
         raise HTTPException(status_code=404, detail="Payslip not found")
     return obj

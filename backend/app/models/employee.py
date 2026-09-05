@@ -1,3 +1,4 @@
+from typing import Optional
 from sqlalchemy import Column, Text, TIMESTAMP, ForeignKey, func, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
@@ -32,3 +33,7 @@ class Employee(Base):
     attendance_records = relationship("Attendance", back_populates="employee", foreign_keys="Attendance.employee_id")
     allocations        = relationship("Allocation", back_populates="employee", foreign_keys="Allocation.employee_id")
     time_off_requests  = relationship("TimeOffRequest", back_populates="employee", foreign_keys="TimeOffRequest.employee_id")
+
+    @property
+    def working_schedule_name(self) -> Optional[str]:
+        return self.working_schedule.name if self.working_schedule else None

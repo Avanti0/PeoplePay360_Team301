@@ -50,6 +50,7 @@ class EmployeeOut(BaseModel):
     job_position: Optional[str] = None
     manager_id: Optional[UUID] = None
     working_schedule_id: Optional[UUID] = None
+    working_schedule_name: Optional[str] = None
     employment_status: EmploymentStatus
     bank_account_number: Optional[str] = None
     bank_name: Optional[str] = None
