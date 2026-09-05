@@ -107,6 +107,14 @@ export interface Employee {
   updatedAt?: string;
 }
 
+export interface EmployeePage {
+  items: Employee[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
 export interface Contract {
   id: string;
   employeeId: string;

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../../services/api';
 import { Employee, Department, JobPosition } from '../../types';
 import { useAuth } from '../../context/AuthContext';
@@ -18,19 +18,61 @@ import {
   Briefcase,
   ChevronRight,
   ShieldAlert,
+  RefreshCw,
 } from 'lucide-react';
+
+const ALLOWED_LIMITS = [10, 25, 50, 100];
+const DEFAULT_LIMIT = 10;
+const ALLOWED_STATUSES = ['active', 'inactive', 'all'];
+const DEFAULT_STATUS = 'active';
+
+function parsePage(raw: string | null): number {
+  const n = parseInt(raw ?? '', 10);
+  return Number.isFinite(n) && n >= 1 ? n : 1;
+}
+
+function parseLimit(raw: string | null): number {
+  const n = parseInt(raw ?? '', 10);
+  return ALLOWED_LIMITS.includes(n) ? n : DEFAULT_LIMIT;
+}
+
+function parseStatus(raw: string | null): string {
+  return raw && ALLOWED_STATUSES.includes(raw) ? raw : DEFAULT_STATUS;
+}
+
+function getPageNumbers(current: number, total: number): number[] {
+  const maxButtons = 5;
+  if (total <= maxButtons) return Array.from({ length: total }, (_, i) => i + 1);
+  let start = Math.max(1, current - 2);
+  const end = Math.min(total, start + maxButtons - 1);
+  start = Math.max(1, end - maxButtons + 1);
+  return Array.from({ length: end - start + 1 }, (_, i) => start + i);
+}
 
 export const EmployeesPage: React.FC = () => {
   const { hasRole } = useAuth();
   const { success, error } = useToast();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // URL query params (status/search/department/page/limit) are the source
+  // of truth for pagination/filter state, so refresh, back/forward, and
+  // shared links all reproduce the same view. All filtering happens
+  // server-side, across the full dataset, not just the loaded page.
+  const status = parseStatus(searchParams.get('status'));
+  const search = searchParams.get('search') || '';
+  const department = searchParams.get('department') || 'all';
+  const page = parsePage(searchParams.get('page'));
+  const limit = parseLimit(searchParams.get('limit'));
 
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [viewMode, setViewMode] = useState<'kanban' | 'list'>('kanban'); // FR-01: Support Kanban and List views
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedDept, setSelectedDept] = useState<string>('all');
-  const [selectedStatus, setSelectedStatus] = useState<string>('all');
+  // Local, immediate text-field value; debounced into the `search` URL
+  // param so the server isn't queried on every keystroke.
+  const [searchInput, setSearchInput] = useState(search);
   const [isLoading, setIsLoading] = useState(true);
 
   // New Employee Modal
@@ -50,40 +92,90 @@ export const EmployeesPage: React.FC = () => {
   });
 
   useEffect(() => {
-    loadData();
+    loadDepartments();
   }, []);
 
-  const loadData = async () => {
+  useEffect(() => {
+    loadEmployees();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, search, department, page, limit]);
+
+  // Debounce the search text field into the URL (and thus the server
+  // query) instead of firing a request on every keystroke.
+  useEffect(() => {
+    const handle = setTimeout(() => {
+      if (searchInput !== search) {
+        updateParams({ search: searchInput, page: '1' });
+      }
+    }, 300);
+    return () => clearTimeout(handle);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchInput]);
+
+  // Keep the text field in sync if the URL's search param changes from
+  // outside the field itself (e.g. browser back/forward navigation).
+  useEffect(() => {
+    setSearchInput(search);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search]);
+
+  const loadDepartments = async () => {
+    try {
+      setDepartments(await api.departments.getAll());
+    } catch {
+      // Department dropdown is a non-critical filter aid; ignore failures here
+      // since employee loading below already surfaces a toast on error.
+    }
+  };
+
+  const loadEmployees = async () => {
     setIsLoading(true);
     try {
-      const [empData, deptData] = await Promise.all([
-        api.employees.getAll(),
-        api.departments.getAll(),
-      ]);
-      setEmployees(empData);
-      setDepartments(deptData);
-      if (deptData.length > 0 && !formData.department) {
-        setFormData((prev) => ({ ...prev, department: deptData[0].name }));
-      }
+      const result = await api.employees.list({
+        status,
+        page,
+        limit,
+        search: search || undefined,
+        department: department !== 'all' ? department : undefined,
+      });
+      setEmployees(result.items);
+      setTotal(result.total);
+      setTotalPages(result.totalPages);
     } catch {
       error('Failed to load employee list');
+      setEmployees([]);
+      setTotal(0);
+      setTotalPages(1);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const filteredEmployees = employees.filter((emp) => {
-    const matchesSearch =
-      emp.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      emp.email.toLowerCase().includes(searchQuery.toLowerCase());
+  const updateParams = (updates: Record<string, string>) => {
+    const next = new URLSearchParams(searchParams);
+    Object.entries(updates).forEach(([key, value]) => {
+      if (value) next.set(key, value);
+      else next.delete(key);
+    });
+    setSearchParams(next);
+  };
 
-    const matchesDept =
-      selectedDept === 'all' || emp.department === selectedDept;
-    const matchesStatus =
-      selectedStatus === 'all' || emp.employmentStatus === selectedStatus;
+  const handleStatusChange = (newStatus: string) => {
+    updateParams({ status: newStatus, page: '1' });
+  };
 
-    return matchesSearch && matchesDept && matchesStatus;
-  });
+  const handleLimitChange = (newLimit: number) => {
+    updateParams({ limit: String(newLimit), page: '1' });
+  };
+
+  const handleDeptChange = (newDept: string) => {
+    updateParams({ department: newDept === 'all' ? '' : newDept, page: '1' });
+  };
+
+  const goToPage = (targetPage: number) => {
+    const clamped = Math.min(Math.max(1, targetPage), totalPages);
+    updateParams({ page: String(clamped) });
+  };
 
   const handleCreateEmployee = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -147,9 +239,10 @@ export const EmployeesPage: React.FC = () => {
         bankName: '',
         bankIfsc: '',
       });
-      loadData();
-    } catch (err: any) {
-      error(err.message || 'Failed to create employee profile');
+      loadEmployees();
+    } catch (err) {
+      const detail = err instanceof Error ? err.message.replace(/^HTTP \d+:\s*/, '') : '';
+      error(detail || 'Failed to create employee profile');
     } finally {
       setIsSubmitting(false);
     }
@@ -214,16 +307,16 @@ export const EmployeesPage: React.FC = () => {
           <input
             type="text"
             placeholder="Search by name, code, or email..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
             className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
           />
         </div>
 
         <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
           <select
-            value={selectedDept}
-            onChange={(e) => setSelectedDept(e.target.value)}
+            value={department}
+            onChange={(e) => handleDeptChange(e.target.value)}
             className="px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
           >
             <option value="all">All Departments</option>
@@ -235,22 +328,49 @@ export const EmployeesPage: React.FC = () => {
           </select>
 
           <select
-            value={selectedStatus}
-            onChange={(e) => setSelectedStatus(e.target.value)}
+            value={status}
+            onChange={(e) => handleStatusChange(e.target.value)}
             className="px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
           >
-            <option value="all">All Statuses</option>
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>
-            <option value="on_leave">On Leave</option>
+            <option value="all">All</option>
+          </select>
+
+          <select
+            value={limit}
+            onChange={(e) => handleLimitChange(Number(e.target.value))}
+            className="px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
+          >
+            {ALLOWED_LIMITS.map((l) => (
+              <option key={l} value={l}>
+                {l} / page
+              </option>
+            ))}
           </select>
         </div>
       </div>
 
+      {/* Loading State */}
+      {isLoading && (
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-12 shadow-sm flex flex-col items-center justify-center gap-2 text-slate-400">
+          <RefreshCw className="w-6 h-6 animate-spin text-blue-600" />
+          <span className="text-xs font-medium">Loading employees...</span>
+        </div>
+      )}
+
+      {/* Empty State */}
+      {!isLoading && employees.length === 0 && (
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-12 shadow-sm flex flex-col items-center justify-center gap-2 text-slate-400">
+          <Users className="w-8 h-8 text-slate-300" />
+          <span className="text-xs font-medium">No employees found matching the current filters.</span>
+        </div>
+      )}
+
       {/* Kanban View */}
-      {viewMode === 'kanban' && (
+      {!isLoading && employees.length > 0 && viewMode === 'kanban' && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {filteredEmployees.map((emp) => (
+          {employees.map((emp) => (
             <div
               key={emp.id}
               onClick={() => navigate(`/employees/${emp.id}`)}
@@ -310,7 +430,7 @@ export const EmployeesPage: React.FC = () => {
       )}
 
       {/* List View */}
-      {viewMode === 'list' && (
+      {!isLoading && employees.length > 0 && viewMode === 'list' && (
         <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
@@ -326,7 +446,7 @@ export const EmployeesPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
-                {filteredEmployees.map((emp) => (
+                {employees.map((emp) => (
                   <tr
                     key={emp.id}
                     onClick={() => navigate(`/employees/${emp.id}`)}
@@ -359,6 +479,42 @@ export const EmployeesPage: React.FC = () => {
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* Pagination Controls */}
+      {!isLoading && total > 0 && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white rounded-2xl border border-slate-200/80 p-4 shadow-sm">
+          <p className="text-xs text-slate-500">
+            Showing {(page - 1) * limit + 1}-{Math.min(page * limit, total)} of {total} employees
+          </p>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => goToPage(page - 1)}
+              disabled={page <= 1}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-slate-300 text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 transition-colors"
+            >
+              Previous
+            </button>
+            {getPageNumbers(page, totalPages).map((p) => (
+              <button
+                key={p}
+                onClick={() => goToPage(p)}
+                className={`w-8 h-8 rounded-lg text-xs font-bold transition-all ${
+                  p === page ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                {p}
+              </button>
+            ))}
+            <button
+              onClick={() => goToPage(page + 1)}
+              disabled={page >= totalPages}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-slate-300 text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 transition-colors"
+            >
+              Next
+            </button>
           </div>
         </div>
       )}
