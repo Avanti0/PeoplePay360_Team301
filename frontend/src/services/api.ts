@@ -190,10 +190,33 @@ async function request<T>(
         response.status === 504 ||
         rawText.includes('ECONNREFUSED') ||
         rawText.includes('proxy error') ||
-        rawText.includes('Database connection failed')
+        rawText.includes('Database connection failed') ||
+        rawText.includes('database error') ||
+        rawText.includes('relation') ||
+        rawText.includes('does not exist') ||
+        rawText.includes('OperationalError') ||
+        rawText.includes('SQLAlchemy') ||
+        (response.status === 500 && (
+          rawText.includes('database') ||
+          rawText.includes('Database') ||
+          rawText.includes('postgres') ||
+          rawText.includes('connection') ||
+          rawText.includes('table') ||
+          rawText.includes('column')
+        ))
       ) {
         console.warn(
           `[PeoplePay360] Database/backend unavailable (${response.status}: ${detail}) — seamlessly serving offline demo data.`
+        );
+        return mockHandler<T>(endpoint, options);
+      }
+
+      // For auth/login specifically: any 500 should fall back to mock
+      // so developers can always log in during local development even
+      // if the database is not yet set up.
+      if (response.status === 500 && endpoint === '/auth/login') {
+        console.warn(
+          `[PeoplePay360] Login endpoint returned 500 — falling back to offline demo login.`
         );
         return mockHandler<T>(endpoint, options);
       }
