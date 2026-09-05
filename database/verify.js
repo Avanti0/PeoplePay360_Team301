@@ -30,23 +30,23 @@ async function verify() {
 
         console.log("\nContract resolution check (Rahul Sharma, period = 2026-03-01..2026-03-31):");
         const resolved = await client.query(
-            `SELECT c.id, c.start_date::text, c.end_date::text, c.wage, c.status
+            `SELECT c.id, c.date_start::text, c.date_end::text, c.wage, c.status
              FROM contracts c
              JOIN employees e ON e.id = c.employee_id
-             WHERE e.employee_code = 'EMP-002'
-               AND c.start_date <= '2026-03-31'
-               AND (c.end_date IS NULL OR c.end_date >= '2026-03-01')`
+             WHERE e.email = 'rahul.sharma@peoplepay360.demo'
+               AND c.date_start <= '2026-03-31'
+               AND (c.date_end IS NULL OR c.date_end >= '2026-03-01')
+               AND c.status = 'active'`
         );
         console.table(resolved.rows);
 
         console.log("\nLeave balance check (Rahul Sharma, Earned Leave):");
         const balance = await client.query(
-            `SELECT la.allocated_amount, la.taken_amount,
-                    (la.allocated_amount - la.taken_amount) AS remaining
-             FROM leave_allocations la
-             JOIN employees e ON e.id = la.employee_id
-             JOIN time_off_types t ON t.id = la.time_off_type_id
-             WHERE e.employee_code = 'EMP-002' AND t.name = 'Earned Leave'`
+            `SELECT a.number_of_days, a.taken, a.remaining
+             FROM allocations a
+             JOIN employees e ON e.id = a.employee_id
+             JOIN time_off_types t ON t.id = a.time_off_type_id
+             WHERE e.email = 'rahul.sharma@peoplepay360.demo' AND t.name = 'Earned Leave'`
         );
         console.table(balance.rows);
 
