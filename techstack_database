@@ -1,0 +1,43 @@
+# Tech Stack - feature/database (Maddi Soumya)
+
+Database Engine : SQLite (file-based, local, zero-config)
+Driver / Access : Node.js built-in `node:sqlite` module (DatabaseSync) - no
+                  external/native npm dependency required (Node >= 22.5.0)
+Schema          : Plain SQL DDL file (database/schema.sql), applied via a
+                  Node migration runner (database/migrate.js)
+Seed Data       : Programmatic seed script (database/seed.js) generating
+                  real relational demo records (not static JSON)
+Tooling scripts : database/reset.js (drop + migrate + seed), database/verify.js
+                  (row-count + business-rule sanity checks)
+
+Why this stack:
+- Fully offline/local - no database server process, no cloud account,
+  no internet connection needed to build, run, or demo the app.
+- Zero install friction - node:sqlite ships with Node.js itself, avoiding
+  native-build tooling issues (node-gyp/Visual Studio) hit with
+  better-sqlite3 on this machine.
+- Still a real, dynamic, queryable relational database (not static
+  JSON), satisfying the "use real-time/dynamic data sources" requirement.
+- Portable schema.sql / seed.js that feature/backend (Avanti) can point
+  any Node-based API layer at directly, and feature/frontend (Vyshnavi)
+  can inspect with any SQLite browser while the API is being built.
+
+Where things live:
+  PeoplePay360_Team301/database/
+    schema.sql   - full DDL: employees, departments, job positions,
+                   working schedules, contracts (period-aware, with
+                   overlap-prevention triggers), attendance, time off
+                   types/allocations/requests, salary structures/rules,
+                   payruns/payslips/payslip lines, payroll warnings,
+                   roles/users (RBAC)
+    migrate.js   - applies schema.sql to database/data/peoplepay360.db
+    seed.js      - inserts demo data reproducing the README's worked
+                   examples (contract resolution, leave balance flow)
+    reset.js     - one-shot: wipe local db file + migrate + seed
+    verify.js    - prints row counts and checks key business rules
+    config.js    - central DB path configuration (PEOPLEPAY_DB_PATH env
+                   override supported)
+    README.md    - setup + usage instructions for the rest of the team
+
+Local database file (git-ignored, generated per developer):
+    PeoplePay360_Team301/database/data/peoplepay360.db
