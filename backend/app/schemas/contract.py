@@ -2,40 +2,34 @@ from datetime import date, datetime
 from decimal import Decimal
 from enum import Enum
 from typing import Optional
+from uuid import UUID
 from pydantic import BaseModel, ConfigDict, field_validator
 
 
-class EmploymentType(str, Enum):
-    permanent = "permanent"
-    contract = "contract"
-    intern = "intern"
-
-
 class ContractStatus(str, Enum):
-    draft = "draft"
-    running = "running"
-    expired = "expired"
+    draft     = "draft"
+    active    = "active"
+    expired   = "expired"
     cancelled = "cancelled"
 
 
 class ContractCreate(BaseModel):
-    employee_id: int
-    start_date: date
-    end_date: Optional[date] = None
+    employee_id: UUID
+    date_start: date
+    date_end: Optional[date] = None
     wage: Decimal
-    department_id: Optional[int] = None
-    job_position_id: Optional[int] = None
-    working_schedule_id: Optional[int] = None
-    salary_structure_id: Optional[int] = None
-    employment_type: EmploymentType = EmploymentType.permanent
+    department: Optional[str] = None
+    job_position: Optional[str] = None
+    working_schedule_id: Optional[UUID] = None
+    salary_structure_id: Optional[UUID] = None
     status: ContractStatus = ContractStatus.draft
 
-    @field_validator("end_date")
+    @field_validator("date_end")
     @classmethod
     def end_after_start(cls, v, info):
-        start = info.data.get("start_date")
+        start = info.data.get("date_start")
         if v is not None and start is not None and v < start:
-            raise ValueError("end_date must be on or after start_date")
+            raise ValueError("date_end must be on or after date_start")
         return v
 
     @field_validator("wage")
@@ -47,14 +41,13 @@ class ContractCreate(BaseModel):
 
 
 class ContractUpdate(BaseModel):
-    start_date: Optional[date] = None
-    end_date: Optional[date] = None
+    date_start: Optional[date] = None
+    date_end: Optional[date] = None
     wage: Optional[Decimal] = None
-    department_id: Optional[int] = None
-    job_position_id: Optional[int] = None
-    working_schedule_id: Optional[int] = None
-    salary_structure_id: Optional[int] = None
-    employment_type: Optional[EmploymentType] = None
+    department: Optional[str] = None
+    job_position: Optional[str] = None
+    working_schedule_id: Optional[UUID] = None
+    salary_structure_id: Optional[UUID] = None
     status: Optional[ContractStatus] = None
 
     @field_validator("wage")
@@ -66,16 +59,15 @@ class ContractUpdate(BaseModel):
 
 
 class ContractOut(BaseModel):
-    id: int
-    employee_id: int
-    start_date: date
-    end_date: Optional[date] = None
+    id: UUID
+    employee_id: UUID
+    date_start: date
+    date_end: Optional[date] = None
     wage: Decimal
-    department_id: Optional[int] = None
-    job_position_id: Optional[int] = None
-    working_schedule_id: Optional[int] = None
-    salary_structure_id: Optional[int] = None
-    employment_type: EmploymentType
+    department: Optional[str] = None
+    job_position: Optional[str] = None
+    working_schedule_id: Optional[UUID] = None
+    salary_structure_id: Optional[UUID] = None
     status: ContractStatus
     created_at: datetime
     updated_at: datetime

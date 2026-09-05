@@ -1,4 +1,5 @@
 from typing import List, Optional
+from uuid import UUID
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
@@ -12,7 +13,7 @@ router = APIRouter(prefix="/api/v1/contracts", tags=["contracts"], dependencies=
 
 @router.get("", response_model=List[ContractOut])
 def list_contracts(
-    employee_id: Optional[int] = Query(None),
+    employee_id: Optional[UUID] = Query(None),
     status_filter: Optional[ContractStatus] = Query(None, alias="status"),
     db: Session = Depends(get_db),
 ):
@@ -27,15 +28,15 @@ def create_contract(data: ContractCreate, db: Session = Depends(get_db)):
 
 
 @router.get("/{contract_id}", response_model=ContractOut)
-def get_contract(contract_id: int, db: Session = Depends(get_db)):
+def get_contract(contract_id: UUID, db: Session = Depends(get_db)):
     return contract_service.get_contract(db, contract_id)
 
 
 @router.put("/{contract_id}", response_model=ContractOut)
-def update_contract(contract_id: int, data: ContractUpdate, db: Session = Depends(get_db)):
+def update_contract(contract_id: UUID, data: ContractUpdate, db: Session = Depends(get_db)):
     return contract_service.update_contract(db, contract_id, data)
 
 
 @router.delete("/{contract_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_admin)])
-def delete_contract(contract_id: int, db: Session = Depends(get_db)):
+def delete_contract(contract_id: UUID, db: Session = Depends(get_db)):
     contract_service.delete_contract(db, contract_id)

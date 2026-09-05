@@ -1,4 +1,5 @@
-from sqlalchemy import Column, BigInteger, Text, Boolean, Date, Numeric, TIMESTAMP, ForeignKey, CheckConstraint, func
+from sqlalchemy import Column, Text, Boolean, Date, Numeric, TIMESTAMP, ForeignKey, CheckConstraint, func, text
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from app.db.session import Base
 from app.models.enums import time_off_unit_enum, allocation_status_enum, time_off_request_status_enum
@@ -7,56 +8,53 @@ from app.models.enums import time_off_unit_enum, allocation_status_enum, time_of
 class TimeOffType(Base):
     __tablename__ = "time_off_types"
 
-    id                  = Column(BigInteger, primary_key=True)
+    id                  = Column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
     name                = Column(Text, nullable=False, unique=True)
     unit                = Column(time_off_unit_enum, nullable=False, server_default="days")
     requires_allocation = Column(Boolean, nullable=False, server_default="true")
-    affects_payroll     = Column(Boolean, nullable=False, server_default="true")
+    approval_required   = Column(Boolean, nullable=False, server_default="true")
     is_active           = Column(Boolean, nullable=False, server_default="true")
 
-    allocations = relationship("LeaveAllocation", back_populates="time_off_type")
+    allocations = relationship("Allocation", back_populates="time_off_type")
     requests    = relationship("TimeOffRequest", back_populates="time_off_type")
 
 
-class LeaveAllocation(Base):
-    __tablename__ = "leave_allocations"
+class Allocation(Base):
+    __tablename__ = "allocations"
 
-    id               = Column(BigInteger, primary_key=True)
-    employee_id      = Column(BigInteger, ForeignKey("employees.id", ondelete="CASCADE"), nullable=False)
-    time_off_type_id = Column(BigInteger, ForeignKey("time_off_types.id"), nullable=False)
-    allocated_amount = Column(Numeric(6, 2), nullable=False)
-    taken_amount     = Column(Numeric(6, 2), nullable=False, server_default="0")
-    valid_from       = Column(Date, nullable=False)
-    valid_to         = Column(Date)
+    id               = Column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
+    employee_id      = Column(UUID(as_uuid=True), ForeignKey("employees.id", ondelete="CASCADE"), nullable=False)
+    time_off_type_id = Column(UUID(as_uuid=True), ForeignKey("time_off_types.id"), nullable=False)
+    number_of_days   = Column(Numeric(6, 2), nullable=False)
+    taken            = Column(Numeric(6, 2), nullable=False, server_default="0")
+    # remaining is a GENERATED ALWAYS AS (number_of_days - taken) STORED
+    # column in schema.sql - read-only from the ORM's point of view.
+    remaining        = Column(Numeric(6, 2))
+    date_from        = Column(Date, nullable=False)
+    date_to          = Column(Date)
     status           = Column(allocation_status_enum, nullable=False, server_default="draft")
-    approved_by      = Column(BigInteger, ForeignKey("employees.id", ondelete="SET NULL"))
     created_at       = Column(TIMESTAMP(timezone=True), nullable=False, server_default=func.now())
 
-    employee      = relationship("Employee", back_populates="leave_allocations", foreign_keys=[employee_id])
+    employee      = relationship("Employee", back_populates="allocations", foreign_keys=[employee_id])
     time_off_type = relationship("TimeOffType", back_populates="allocations")
-    approver      = relationship("Employee", foreign_keys=[approved_by])
     requests      = relationship("TimeOffRequest", back_populates="allocation")
 
 
 class TimeOffRequest(Base):
     __tablename__ = "time_off_requests"
-    __table_args__ = (CheckConstraint("end_date >= start_date"),)
+    __table_args__ = (CheckConstraint("date_to >= date_from"),)
 
-    id               = Column(BigInteger, primary_key=True)
-    employee_id      = Column(BigInteger, ForeignKey("employees.id", ondelete="CASCADE"), nullable=False)
-    time_off_type_id = Column(BigInteger, ForeignKey("time_off_types.id"), nullable=False)
-    allocation_id    = Column(BigInteger, ForeignKey("leave_allocations.id", ondelete="SET NULL"))
-    start_date       = Column(Date, nullable=False)
-    end_date         = Column(Date, nullable=False)
+    id               = Column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
+    employee_id      = Column(UUID(as_uuid=True), ForeignKey("employees.id", ondelete="CASCADE"), nullable=False)
+    time_off_type_id = Column(UUID(as_uuid=True), ForeignKey("time_off_types.id"), nullable=False)
+    allocation_id    = Column(UUID(as_uuid=True), ForeignKey("allocations.id", ondelete="SET NULL"))
+    date_from        = Column(Date, nullable=False)
+    date_to          = Column(Date, nullable=False)
     duration         = Column(Numeric(6, 2), nullable=False)
-    status           = Column(time_off_request_status_enum, nullable=False, server_default="submitted")
-    reason           = Column(Text)
-    approved_by      = Column(BigInteger, ForeignKey("employees.id", ondelete="SET NULL"))
-    approved_at      = Column(TIMESTAMP(timezone=True))
+    status           = Column(time_off_request_status_enum, nullable=False, server_default="draft")
+    note             = Column(Text)
     created_at       = Column(TIMESTAMP(timezone=True), nullable=False, server_default=func.now())
-    updated_at       = Column(TIMESTAMP(timezone=True), nullable=False, server_default=func.now())
 
     employee      = relationship("Employee", back_populates="time_off_requests", foreign_keys=[employee_id])
     time_off_type = relationship("TimeOffType", back_populates="requests")
-    allocation    = relationship("LeaveAllocation", back_populates="requests")
-    approver      = relationship("Employee", foreign_keys=[approved_by])
+    allocation    = relationship("Allocation", back_populates="requests")
