@@ -11,6 +11,7 @@
 const fs = require("fs");
 const { Client } = require("pg");
 const { PG_CONFIG, SCHEMA_PATH } = require("./config");
+const { describeError } = require("./errors");
 
 async function ensureDatabaseExists() {
     // Connect to the always-present "postgres" maintenance database to
@@ -50,7 +51,7 @@ async function migrate() {
 
 if (require.main === module) {
     migrate().catch((err) => {
-        console.error("Migration failed:", err.message);
+        console.error("Migration failed:", describeError(err));
         process.exit(1);
     });
 }

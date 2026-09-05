@@ -16,6 +16,7 @@
  */
 const { Client } = require("pg");
 const { PG_CONFIG } = require("./config");
+const { describeError } = require("./errors");
 
 async function run(client, sql, params = []) {
     const { rows } = await client.query(`${sql} RETURNING id`, params);
@@ -562,7 +563,7 @@ async function seed() {
 
 if (require.main === module) {
     seed().catch((err) => {
-        console.error("Seeding failed:", err.message);
+        console.error("Seeding failed:", describeError(err));
         process.exit(1);
     });
 }

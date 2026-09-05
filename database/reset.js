@@ -7,6 +7,7 @@
  */
 const { migrate } = require("./migrate");
 const { seed } = require("./seed");
+const { describeError } = require("./errors");
 
 async function reset() {
     await migrate();
@@ -16,7 +17,7 @@ async function reset() {
 
 if (require.main === module) {
     reset().catch((err) => {
-        console.error("Reset failed:", err.message);
+        console.error("Reset failed:", describeError(err));
         process.exit(1);
     });
 }

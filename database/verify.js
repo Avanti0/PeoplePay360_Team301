@@ -7,6 +7,7 @@
  */
 const { Client } = require("pg");
 const { PG_CONFIG } = require("./config");
+const { describeError } = require("./errors");
 
 async function verify() {
     const client = new Client(PG_CONFIG);
@@ -57,7 +58,7 @@ async function verify() {
 
 if (require.main === module) {
     verify().catch((err) => {
-        console.error("Verification failed:", err.message);
+        console.error("Verification failed:", describeError(err));
         process.exit(1);
     });
 }
