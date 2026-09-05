@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 import {
   LayoutDashboard,
   Users,
@@ -16,6 +17,7 @@ import {
   Sliders,
   X,
   Sparkles,
+  ShieldCheck,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -41,6 +43,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onCloseMobile,
 }) => {
   const location = useLocation();
+  const { hasRole, user } = useAuth();
+  const isAdmin = hasRole('admin') || user?.role === 'admin';
 
   // Navigation Groups matching Prompt 4
   const navGroups: NavGroup[] = [
@@ -84,6 +88,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
         { name: 'Payslips', to: '/payslips', icon: Receipt },
       ],
     },
+    ...(isAdmin
+      ? [
+          {
+            name: 'Administration',
+            icon: ShieldCheck,
+            children: [
+              { name: 'User Management', to: '/users', icon: ShieldCheck },
+            ],
+          },
+        ]
+      : []),
   ];
 
   // Track expanded groups (all expanded by default for quick access)
@@ -92,6 +107,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     Attendance: true,
     'Time Off': true,
     Payroll: true,
+    Administration: true,
   });
 
   const toggleGroup = (groupName: string) => {

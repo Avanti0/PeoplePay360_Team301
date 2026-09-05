@@ -76,20 +76,19 @@ INSERT INTO time_off_types (id, name, unit, requires_allocation, approval_requir
     ('c0000000-0000-0000-0000-000000000004', 'Unpaid Leave', 'days', FALSE, TRUE);
 
 -- ---------------------------------------------------------------------
--- Users (login accounts). password_hash is a placeholder - NOT a real
--- bcrypt hash - feature/backend must replace these before go-live
--- (NFR-03 requires real bcrypt hashes).
+-- Users (login accounts).
+-- Password for all seeded demo accounts is 'Test@123' (bcrypt cost 12).
 -- ---------------------------------------------------------------------
 INSERT INTO users (id, username, password_hash, role) VALUES
-    ('d0000000-0000-0000-0000-000000000001', 'emp-001', 'DEMO_HASH_CHANGE_ME', 'hr_manager'),
-    ('d0000000-0000-0000-0000-000000000002', 'emp-002', 'DEMO_HASH_CHANGE_ME', 'employee'),
-    ('d0000000-0000-0000-0000-000000000003', 'emp-003', 'DEMO_HASH_CHANGE_ME', 'employee'),
-    ('d0000000-0000-0000-0000-000000000004', 'emp-004', 'DEMO_HASH_CHANGE_ME', 'hr_payroll_manager'),
-    ('d0000000-0000-0000-0000-000000000005', 'emp-005', 'DEMO_HASH_CHANGE_ME', 'hr_payroll_user'),
-    ('d0000000-0000-0000-0000-000000000006', 'emp-006', 'DEMO_HASH_CHANGE_ME', 'employee'),
-    ('d0000000-0000-0000-0000-000000000007', 'emp-007', 'DEMO_HASH_CHANGE_ME', 'employee'),
-    ('d0000000-0000-0000-0000-000000000008', 'emp-008', 'DEMO_HASH_CHANGE_ME', 'employee'),
-    ('d0000000-0000-0000-0000-000000000009', 'admin',   'DEMO_HASH_CHANGE_ME', 'admin');
+    ('d0000000-0000-0000-0000-000000000001', 'emp-001', '$2b$12$7BWWqZpksmA6z8key2DTJ.npLthckzLkNGXYkQxs.58DaYgcAUSp.', 'hr_manager'),
+    ('d0000000-0000-0000-0000-000000000002', 'emp-002', '$2b$12$SXwVQT/PxDHv2gXtvEWV/OI3vbUYJYnRVOOaEkVOo1ZxPnn.e/hO6', 'employee'),
+    ('d0000000-0000-0000-0000-000000000003', 'emp-003', '$2b$12$Rd1TkTCNg.ZI9kaNwZM.MOAPJD5a7doSXovQ.Ykuqo3j7p0Cc.qF2', 'employee'),
+    ('d0000000-0000-0000-0000-000000000004', 'emp-004', '$2b$12$0g7dHEYmWPuP1lz5OKBxvOQbZ.VxgIIBZOcvGSFzPY/ynKOajLMgO', 'hr_payroll_manager'),
+    ('d0000000-0000-0000-0000-000000000005', 'emp-005', '$2b$12$.wO13bw8UAlioonWOIZM2ux2OH5M/Wmmmgx5BsNcwfcTm6KCFgYjq', 'hr_payroll_user'),
+    ('d0000000-0000-0000-0000-000000000006', 'emp-006', '$2b$12$8yIhk2q5rOuwP9gYjDkU/.vtgFhad5lppCFbTNalSatwQNjgwtH/G', 'employee'),
+    ('d0000000-0000-0000-0000-000000000007', 'emp-007', '$2b$12$Wo/XIXASmhhZLovXIWvtweNlhVNRySDXFlLpsKStA0V1doFdDj41q', 'employee'),
+    ('d0000000-0000-0000-0000-000000000008', 'emp-008', '$2b$12$YS.ihbZD3Tdz1Sosfv1NXOVzwM4T4dmgTbCE1.qVp2NeZMtukSn2K', 'employee'),
+    ('d0000000-0000-0000-0000-000000000009', 'admin',   '$2b$12$xd06RwGvQC//ectF7ASfnOPb3eF6mEooaF6KtHq7FtyLEAAXDD622', 'admin');
 
 -- ---------------------------------------------------------------------
 -- Employees

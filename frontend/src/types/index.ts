@@ -43,9 +43,12 @@ export interface User {
   role: RoleName;
   employeeId?: string;
   employeeName?: string;
+  employeeEmail?: string;
+  department?: string;
   email?: string;
   isActive: boolean;
   lastLoginAt?: string;
+  createdAt?: string;
 }
 
 // Frontend-only reference lists (not real backend entities - see file header).

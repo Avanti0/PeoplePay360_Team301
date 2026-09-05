@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     PGHOST: str = "localhost"
     PGPORT: int = 5432
     PGUSER: str = "postgres"
-    PGPASSWORD: str = "password"
+    PGPASSWORD: str = "postgres"
     PGDATABASE: str = "peoplepay360"
 
     SECRET_KEY: str = "change-this-secret"
