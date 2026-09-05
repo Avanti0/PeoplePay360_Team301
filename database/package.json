@@ -1,0 +1,26 @@
+{
+  "name": "peoplepay360-database",
+  "version": "1.0.0",
+  "description": "Database layer (schema, migrations, seed data) for PeoplePay360 HR & Payroll platform - feature/database branch",
+  "private": true,
+  "main": "index.js",
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "scripts": {
+    "migrate": "node migrate.js",
+    "seed": "node seed.js",
+    "reset": "node reset.js",
+    "verify": "node verify.js"
+  },
+  "keywords": [
+    "peoplepay360",
+    "hr",
+    "payroll",
+    "sqlite",
+    "database"
+  ],
+  "author": "Maddi Soumya",
+  "license": "UNLICENSED",
+  "dependencies": {}
+}
