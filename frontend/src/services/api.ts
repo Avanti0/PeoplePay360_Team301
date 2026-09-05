@@ -110,6 +110,7 @@ let salaryStructuresStore = [...initialSalaryStructures];
 let salaryRulesStore = [...initialSalaryRules];
 let payrunsStore = [...initialPayruns];
 let payslipsStore = [...initialPayslips];
+let usersStore: User[] = [...demoUsers];
 
 // ---------------------------------------------------------------------
 // HTTP Fetcher with automatic mock fallback
@@ -164,10 +165,29 @@ async function request<T>(
   if (!response.ok) {
     let detail = response.statusText;
     try {
-      const body = await response.json();
-      detail = body?.detail || detail;
+      const rawText = await response.text();
+      try {
+        const body = JSON.parse(rawText);
+        detail = body?.detail || detail;
+      } catch {
+        // Non-JSON response
+      }
+
+      if (
+        response.status === 503 ||
+        response.status === 502 ||
+        response.status === 504 ||
+        rawText.includes('ECONNREFUSED') ||
+        rawText.includes('proxy error') ||
+        rawText.includes('Database connection failed')
+      ) {
+        console.warn(
+          `[PeoplePay360] Database/backend unavailable (${response.status}: ${detail}) — seamlessly serving offline demo data.`
+        );
+        return mockHandler<T>(endpoint, options);
+      }
     } catch {
-      // response body wasn't JSON — keep statusText
+      // response reading failed
     }
     throw new Error(`HTTP ${response.status}: ${detail}`);
   }
@@ -273,6 +293,89 @@ function handleMockRoutes(endpoint: string, method: string, body: any): any {
     inMemoryAccessToken = null;
     currentAuthUser = null;
     return { success: true };
+  }
+
+  // Users Management
+  if (endpoint === '/users' && method === 'GET') {
+    return usersStore.map((u) => {
+      const emp = employeesStore.find((e) => e.userId === u.id || e.id === u.employeeId);
+      return {
+        ...u,
+        employeeId: emp?.id || u.employeeId,
+        employeeName: emp?.name || u.employeeName,
+        employeeEmail: emp?.email || u.email,
+        department: emp?.department,
+        createdAt: u.createdAt || '2026-09-01T00:00:00Z',
+      };
+    });
+  }
+
+  if (endpoint.startsWith('/users/') && method === 'GET') {
+    const id = endpoint.split('/')[2];
+    const user = usersStore.find((u) => u.id === id);
+    if (!user) throw new Error('User not found');
+    const emp = employeesStore.find((e) => e.userId === user.id || e.id === user.employeeId);
+    return {
+      ...user,
+      employeeId: emp?.id || user.employeeId,
+      employeeName: emp?.name || user.employeeName,
+      employeeEmail: emp?.email || user.email,
+      department: emp?.department,
+    };
+  }
+
+  if (endpoint === '/users' && method === 'POST') {
+    const emp = body.employee_id ? employeesStore.find((e) => e.id === body.employee_id) : null;
+    const newUser: User = {
+      id: 'usr-' + Date.now(),
+      username: body.username,
+      role: body.role,
+      isActive: body.is_active !== undefined ? body.is_active : true,
+      employeeId: emp?.id,
+      employeeName: emp?.name,
+      employeeEmail: emp?.email,
+      department: emp?.department,
+      createdAt: new Date().toISOString(),
+    };
+    if (emp) {
+      emp.userId = newUser.id;
+    }
+    usersStore.push(newUser);
+    return newUser;
+  }
+
+  if (endpoint.startsWith('/users/') && method === 'PUT') {
+    const id = endpoint.split('/')[2];
+    const userIndex = usersStore.findIndex((u) => u.id === id);
+    if (userIndex === -1) throw new Error('User not found');
+    const prev = usersStore[userIndex];
+    let emp = prev.employeeId ? employeesStore.find((e) => e.id === prev.employeeId) : null;
+    if (body.employee_id !== undefined) {
+      if (emp) emp.userId = undefined;
+      emp = body.employee_id ? employeesStore.find((e) => e.id === body.employee_id) : null;
+      if (emp) emp.userId = id;
+    }
+    const updated: User = {
+      ...prev,
+      role: body.role || prev.role,
+      isActive: body.is_active !== undefined ? body.is_active : prev.isActive,
+      employeeId: emp?.id,
+      employeeName: emp?.name,
+      employeeEmail: emp?.email,
+      department: emp?.department,
+    };
+    usersStore[userIndex] = updated;
+    return updated;
+  }
+
+  if (endpoint.startsWith('/users/') && method === 'DELETE') {
+    const id = endpoint.split('/')[2];
+    const user = usersStore.find((u) => u.id === id);
+    if (!user) throw new Error('User not found');
+    const emp = employeesStore.find((e) => e.userId === id);
+    if (emp) emp.userId = undefined;
+    usersStore = usersStore.filter((u) => u.id !== id);
+    return { detail: 'User deleted successfully' };
   }
 
   // Dashboard
@@ -975,5 +1078,24 @@ export const api = {
 
   departments: {
     getAll: () => Promise.resolve(initialDepartments),
+  },
+
+  users: {
+    getAll: () => request<User[]>('/users'),
+    getById: (id: string | number) => request<User>(`/users/${id}`),
+    create: (data: { username: string; password?: string; role: RoleName; isActive?: boolean; employeeId?: string }) =>
+      request<User>('/users', {
+        method: 'POST',
+        body: JSON.stringify(camelToSnake(data)),
+      }),
+    update: (id: string | number, data: { role?: RoleName; isActive?: boolean; password?: string; employeeId?: string | null }) =>
+      request<User>(`/users/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(camelToSnake(data)),
+      }),
+    delete: (id: string | number) =>
+      request<{ detail: string }>(`/users/${id}`, {
+        method: 'DELETE',
+      }),
   },
 };

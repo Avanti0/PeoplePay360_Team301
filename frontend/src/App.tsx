@@ -20,11 +20,20 @@ import { PayrunsPage } from './pages/payruns/PayrunsPage';
 import { PayrunDetailPage } from './pages/payruns/PayrunDetailPage';
 import { PayslipsPage } from './pages/payslips/PayslipsPage';
 import { PayslipDetailPage } from './pages/payslips/PayslipDetailPage';
+import { UsersPage } from './pages/users/UsersPage';
+import { UnauthorizedPage } from './pages/auth/UnauthorizedPage';
+import { RoleName } from './types';
 
-const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { isAuthenticated } = useAuth();
+const ProtectedRoute: React.FC<{ children: React.ReactNode; requiredRole?: RoleName }> = ({
+  children,
+  requiredRole,
+}) => {
+  const { isAuthenticated, hasRole } = useAuth();
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
+  }
+  if (requiredRole && !hasRole(requiredRole)) {
+    return <Navigate to="/unauthorized" replace />;
   }
   return <>{children}</>;
 };
@@ -36,6 +45,7 @@ export const App: React.FC = () => {
         <BrowserRouter>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/unauthorized" element={<UnauthorizedPage />} />
 
             <Route
               path="/"
@@ -47,6 +57,7 @@ export const App: React.FC = () => {
             >
               <Route index element={<Navigate to="/dashboard" replace />} />
               <Route path="dashboard" element={<DashboardPage />} />
+              <Route path="users" element={<ProtectedRoute requiredRole="admin"><UsersPage /></ProtectedRoute>} />
               <Route path="employees" element={<EmployeesPage />} />
               <Route path="employees/:id" element={<EmployeeDetailPage />} />
               <Route path="contracts" element={<ContractsPage />} />
