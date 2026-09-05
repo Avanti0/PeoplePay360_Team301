@@ -73,12 +73,17 @@ export const TimeOffPage: React.FC<TimeOffPageProps> = ({ defaultTab }) => {
 
   const loadData = async () => {
     try {
-      const [reqs, allocs, types, emps] = await Promise.all([
+      const [reqsRes, allocsRes, typesRes, empsRes] = await Promise.allSettled([
         api.timeOffRequests.getAll(),
         api.allocations.getAll(),
         api.timeOffTypes.getAll(),
         api.employees.getAll(),
       ]);
+      const reqs = reqsRes.status === "fulfilled" ? reqsRes.value : [];
+      const allocs = allocsRes.status === "fulfilled" ? allocsRes.value : [];
+      const types = typesRes.status === "fulfilled" ? typesRes.value : [];
+      const emps = empsRes.status === "fulfilled" ? empsRes.value : [];
+
       setRequests(reqs);
       setAllocations(allocs);
       setLeaveTypes(types);
@@ -322,15 +327,21 @@ export const TimeOffPage: React.FC<TimeOffPageProps> = ({ defaultTab }) => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
-                {requests.map((req) => (
+                {requests.map((req) => {
+                  const emp = employees.find((e) => String(e.id) === String(req.employeeId));
+                  const type = leaveTypes.find((t) => String(t.id) === String(req.timeOffTypeId));
+                  const empName = req.employeeName || emp?.name || "Employee";
+                  const deptName = req.departmentName || emp?.department || "";
+                  const typeName = req.timeOffTypeName || type?.name || "Leave";
+                  return (
                   <tr key={req.id} className="hover:bg-slate-50/80 transition-colors">
                     <td className="py-3 px-4">
                       <div>
-                        <p className="font-bold text-slate-900">{req.employeeName}</p>
-                        <p className="text-[10px] text-slate-400">{req.departmentName}</p>
+                        <p className="font-bold text-slate-900">{empName}</p>
+                        <p className="text-[10px] text-slate-400">{deptName}</p>
                       </div>
                     </td>
-                    <td className="py-3 px-4 font-semibold text-slate-800">{req.timeOffTypeName}</td>
+                    <td className="py-3 px-4 font-semibold text-slate-800">{typeName}</td>
                     <td className="py-3 px-4 text-slate-600">
                       {req.dateFrom} &rarr; {req.dateTo}
                     </td>
@@ -366,7 +377,8 @@ export const TimeOffPage: React.FC<TimeOffPageProps> = ({ defaultTab }) => {
                       </td>
                     )}
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -389,10 +401,15 @@ export const TimeOffPage: React.FC<TimeOffPageProps> = ({ defaultTab }) => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
-                {allocations.map((alloc) => (
+                {allocations.map((alloc) => {
+                  const emp = employees.find((e) => String(e.id) === String(alloc.employeeId));
+                  const type = leaveTypes.find((t) => String(t.id) === String(alloc.timeOffTypeId));
+                  const empName = alloc.employeeName || emp?.name || "Employee";
+                  const typeName = alloc.timeOffTypeName || type?.name || "Leave";
+                  return (
                   <tr key={alloc.id} className="hover:bg-slate-50/80 transition-colors">
-                    <td className="py-3 px-4 font-bold text-slate-900">{alloc.employeeName}</td>
-                    <td className="py-3 px-4 font-semibold text-slate-800">{alloc.timeOffTypeName}</td>
+                    <td className="py-3 px-4 font-bold text-slate-900">{empName}</td>
+                    <td className="py-3 px-4 font-semibold text-slate-800">{typeName}</td>
                     <td className="py-3 px-4 text-slate-500">
                       {alloc.dateFrom} &rarr; {alloc.dateTo || 'Ongoing'}
                     </td>
@@ -407,7 +424,8 @@ export const TimeOffPage: React.FC<TimeOffPageProps> = ({ defaultTab }) => {
                       <StatusBadge status={alloc.status} />
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

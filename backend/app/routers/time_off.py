@@ -16,27 +16,33 @@ from app.services import time_off_service
 # ---------------------------------------------------------------------
 # Time Off Types
 # ---------------------------------------------------------------------
-types_router = APIRouter(
-    prefix="/api/v1/time-off-types", tags=["time-off-types"], dependencies=[Depends(require_hr_manager)]
-)
+types_router = APIRouter(prefix="/api/v1/time-off-types", tags=["time-off-types"])
 
 
 @types_router.get("", response_model=List[TimeOffTypeOut])
-def list_time_off_types(is_active: Optional[bool] = Query(None), db: Session = Depends(get_db)):
+def list_time_off_types(
+    is_active: Optional[bool] = Query(None),
+    db: Session = Depends(get_db),
+    _ = Depends(get_current_user),
+):
     return time_off_service.list_time_off_types(db, is_active=is_active)
 
 
-@types_router.post("", response_model=TimeOffTypeOut)
+@types_router.post("", response_model=TimeOffTypeOut, dependencies=[Depends(require_hr_manager)])
 def create_time_off_type(data: TimeOffTypeCreate, db: Session = Depends(get_db)):
     return time_off_service.create_time_off_type(db, data)
 
 
 @types_router.get("/{type_id}", response_model=TimeOffTypeOut)
-def get_time_off_type(type_id: UUID, db: Session = Depends(get_db)):
+def get_time_off_type(
+    type_id: UUID,
+    db: Session = Depends(get_db),
+    _ = Depends(get_current_user),
+):
     return time_off_service.get_time_off_type(db, type_id)
 
 
-@types_router.put("/{type_id}", response_model=TimeOffTypeOut)
+@types_router.put("/{type_id}", response_model=TimeOffTypeOut, dependencies=[Depends(require_hr_manager)])
 def update_time_off_type(type_id: UUID, data: TimeOffTypeUpdate, db: Session = Depends(get_db)):
     return time_off_service.update_time_off_type(db, type_id, data)
 
@@ -49,27 +55,41 @@ def delete_time_off_type(type_id: UUID, db: Session = Depends(get_db)):
 # ---------------------------------------------------------------------
 # Allocations
 # ---------------------------------------------------------------------
-allocations_router = APIRouter(
-    prefix="/api/v1/allocations", tags=["allocations"], dependencies=[Depends(require_hr_manager)]
-)
+allocations_router = APIRouter(prefix="/api/v1/allocations", tags=["allocations"])
 
 
 @allocations_router.get("", response_model=List[AllocationOut])
-def list_allocations(employee_id: Optional[UUID] = Query(None), db: Session = Depends(get_db)):
+def list_allocations(
+    employee_id: Optional[UUID] = Query(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if not is_hr_manager_or_above(current_user):
+        emp_id = current_employee_id(current_user)
+        if not emp_id:
+            return []
+        employee_id = emp_id
     return time_off_service.list_allocations(db, employee_id=employee_id)
 
 
-@allocations_router.post("", response_model=AllocationOut)
+@allocations_router.post("", response_model=AllocationOut, dependencies=[Depends(require_hr_manager)])
 def create_allocation(data: AllocationCreate, db: Session = Depends(get_db)):
     return time_off_service.create_allocation(db, data)
 
 
 @allocations_router.get("/{allocation_id}", response_model=AllocationOut)
-def get_allocation(allocation_id: UUID, db: Session = Depends(get_db)):
-    return time_off_service.get_allocation(db, allocation_id)
+def get_allocation(
+    allocation_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    record = time_off_service.get_allocation(db, allocation_id)
+    if not is_hr_manager_or_above(current_user) and current_employee_id(current_user) != record.employee_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
+    return record
 
 
-@allocations_router.put("/{allocation_id}", response_model=AllocationOut)
+@allocations_router.put("/{allocation_id}", response_model=AllocationOut, dependencies=[Depends(require_hr_manager)])
 def update_allocation(allocation_id: UUID, data: AllocationUpdate, db: Session = Depends(get_db)):
     return time_off_service.update_allocation(db, allocation_id, data)
 

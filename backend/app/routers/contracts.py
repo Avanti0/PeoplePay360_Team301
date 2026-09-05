@@ -5,7 +5,10 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.core.dependencies import require_hr_manager, require_admin
-from app.schemas.contract import ContractCreate, ContractUpdate, ContractOut, ContractStatus
+from app.schemas.contract import (
+    ContractCreate, ContractUpdate, ContractOut, ContractStatus,
+    BulkContractCreate, BulkContractUpdate, BulkContractDelete, BulkOperationResult,
+)
 from app.services import contract_service
 
 router = APIRouter(prefix="/api/v1/contracts", tags=["contracts"], dependencies=[Depends(require_hr_manager)])
@@ -27,6 +30,21 @@ def create_contract(data: ContractCreate, db: Session = Depends(get_db)):
     return contract_service.create_contract(db, data)
 
 
+@router.post("/bulk-create", response_model=BulkOperationResult)
+def bulk_create_contracts(data: BulkContractCreate, db: Session = Depends(get_db)):
+    return contract_service.bulk_create_contracts(db, data)
+
+
+@router.patch("/bulk-update", response_model=BulkOperationResult)
+def bulk_update_contracts(data: BulkContractUpdate, db: Session = Depends(get_db)):
+    return contract_service.bulk_update_contracts(db, data)
+
+
+@router.post("/bulk-delete", response_model=BulkOperationResult)
+def bulk_delete_contracts(data: BulkContractDelete, db: Session = Depends(get_db)):
+    return contract_service.bulk_delete_contracts(db, data)
+
+
 @router.get("/{contract_id}", response_model=ContractOut)
 def get_contract(contract_id: UUID, db: Session = Depends(get_db)):
     return contract_service.get_contract(db, contract_id)
@@ -40,3 +58,4 @@ def update_contract(contract_id: UUID, data: ContractUpdate, db: Session = Depen
 @router.delete("/{contract_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_admin)])
 def delete_contract(contract_id: UUID, db: Session = Depends(get_db)):
     contract_service.delete_contract(db, contract_id)
+

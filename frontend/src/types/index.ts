@@ -296,3 +296,56 @@ export interface DashboardAlert {
   employeeName?: string;
   message: string;
 }
+
+// Bulk Contract Operations Types
+export interface BulkFailureDetail {
+  id: string;
+  name: string;
+  reason: string;
+}
+
+export interface BulkOperationResult {
+  operation: string;
+  total: number;
+  successCount: number;
+  failedCount: number;
+  successIds: string[];
+  failures: BulkFailureDetail[];
+}
+
+export interface BulkContractCreateData {
+  employeeIds: string[];
+  dateStart: string;
+  dateEnd?: string | null;
+  wage: number;
+  department?: string;
+  jobPosition?: string;
+  workingScheduleId?: string | null;
+  salaryStructureId?: string | null;
+  status?: ContractStatus;
+}
+
+export interface BulkContractUpdateData {
+  contractIds: string[];
+  dateStart?: string;
+  dateEnd?: string | null;
+  wage?: number;
+  department?: string;
+  jobPosition?: string;
+  workingScheduleId?: string | null;
+  salaryStructureId?: string | null;
+  status?: ContractStatus;
+  updateDateStart?: boolean;
+  updateDateEnd?: boolean;
+  updateWage?: boolean;
+  updateDepartment?: boolean;
+  updateJobPosition?: boolean;
+  updateWorkingScheduleId?: boolean;
+  updateSalaryStructureId?: boolean;
+  updateStatus?: boolean;
+}
+
+export interface BulkContractDeleteData {
+  contractIds: string[];
+}
+

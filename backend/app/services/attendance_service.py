@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import Optional
 from uuid import UUID
@@ -57,31 +57,63 @@ def create_attendance(db: Session, data: AttendanceCreate) -> Attendance:
     if not db.query(Employee).filter(Employee.id == data.employee_id).first():
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Employee not found")
 
-    if data.check_in is not None:
-        duplicate = (
-            db.query(Attendance)
-            .filter(
-                Attendance.employee_id == data.employee_id,
-                func.date(Attendance.check_in) == data.check_in.date(),
-            )
-            .first()
+    now_dt = datetime.now(timezone.utc)
+    check_in_val = data.check_in or now_dt
+    target_date = check_in_val.date()
+
+    existing_record = (
+        db.query(Attendance)
+        .filter(
+            Attendance.employee_id == data.employee_id,
+            func.date(Attendance.check_in) == target_date,
         )
-        if duplicate:
+        .first()
+    )
+
+    if existing_record:
+        # If the existing record is missing check_out, this punch completes the shift by checking out
+        if existing_record.check_out is None:
+            checkout_val = data.check_out or now_dt
+            if checkout_val <= existing_record.check_in:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Check-out time cannot be earlier than or equal to check-in time",
+                )
+            existing_record.check_out = checkout_val
+            existing_record.worked_hours = _compute_worked_hours(existing_record.check_in, existing_record.check_out)
+            if data.note:
+                existing_record.note = (
+                    f"{existing_record.note} | {data.note}" if existing_record.note else data.note
+                )
+            try:
+                db.commit()
+            except IntegrityError:
+                db.rollback()
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Could not record check-out")
+            return get_attendance(db, existing_record.id)
+        else:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Attendance record already exists for this employee on this date",
+                detail="Attendance record already exists and is completed for this date",
             )
 
-    record = Attendance(**data.model_dump())
-    record.worked_hours = _compute_worked_hours(data.check_in, data.check_out)
+    record = Attendance(
+        employee_id=data.employee_id,
+        check_in=check_in_val,
+        check_out=data.check_out,
+        status=data.status,
+        note=data.note,
+        is_manual=False,
+    )
+    record.worked_hours = _compute_worked_hours(record.check_in, record.check_out)
     db.add(record)
     try:
         db.commit()
     except IntegrityError:
         db.rollback()
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Could not create attendance record")
-    db.refresh(record)
-    return record
+    db.commit()
+    return get_attendance(db, record.id)
 
 
 def update_attendance(db: Session, attendance_id: UUID, data: AttendanceUpdate) -> Attendance:

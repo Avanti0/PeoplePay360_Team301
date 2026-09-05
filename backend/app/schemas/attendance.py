@@ -14,7 +14,7 @@ class AttendanceStatus(str, Enum):
 
 
 class AttendanceCreate(BaseModel):
-    employee_id: UUID
+    employee_id: Optional[UUID] = None
     check_in: Optional[datetime] = None
     check_out: Optional[datetime] = None
     status: AttendanceStatus = AttendanceStatus.present

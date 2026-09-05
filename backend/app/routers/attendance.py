@@ -13,14 +13,22 @@ from app.services import attendance_service
 router = APIRouter(prefix="/api/v1/attendance", tags=["attendance"])
 
 
-@router.get("", response_model=List[AttendanceOut], dependencies=[Depends(require_hr_manager)])
+@router.get("", response_model=List[AttendanceOut])
 def list_attendance(
     employee_id: Optional[UUID] = Query(None),
     date_from: Optional[date] = Query(None),
     date_to: Optional[date] = Query(None),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    return attendance_service.list_attendance(db, employee_id=employee_id, date_from=date_from, date_to=date_to)
+    if not is_hr_manager_or_above(current_user):
+        emp_id = current_employee_id(current_user)
+        if not emp_id:
+            return []
+        employee_id = emp_id
+    clean_date_from = date_from if isinstance(date_from, date) else None
+    clean_date_to = date_to if isinstance(date_to, date) else None
+    return attendance_service.list_attendance(db, employee_id=employee_id, date_from=clean_date_from, date_to=clean_date_to)
 
 
 @router.post("", response_model=AttendanceOut)
@@ -29,8 +37,30 @@ def create_attendance(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if not is_hr_manager_or_above(current_user) and current_employee_id(current_user) != data.employee_id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You may only record your own attendance")
+    if not is_hr_manager_or_above(current_user):
+        user_emp_id = current_employee_id(current_user)
+        if not user_emp_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="No employee profile is linked to your user account",
+            )
+        if data.employee_id is not None and data.employee_id != user_emp_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You may only record attendance for yourself",
+            )
+        data.employee_id = user_emp_id
+    else:
+        if data.employee_id is None:
+            user_emp_id = current_employee_id(current_user)
+            if user_emp_id:
+                data.employee_id = user_emp_id
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Employee ID is required",
+                )
+
     return attendance_service.create_attendance(db, data)
 
 

@@ -43,6 +43,9 @@ require_admin             = require_roles("admin")
 def is_hr_manager_or_above(current_user: User) -> bool:
     return current_user.role in HR_MANAGER_ROLES
 
+def is_hr_payroll_user_or_above(current_user: User) -> bool:
+    return current_user.role in ("hr_payroll_user", "hr_payroll_manager", "admin")
+
 # For routes documented as "HR Manager+ / own" in spec.md: HR Manager and
 # above may access any employee_id; a plain Employee may only access the
 # record linked to their own user account.

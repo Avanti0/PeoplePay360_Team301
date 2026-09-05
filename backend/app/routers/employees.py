@@ -4,7 +4,8 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.core.dependencies import require_hr_manager, require_admin, require_hr_manager_or_self
+from app.models.user import User
+from app.core.dependencies import get_current_user, require_hr_manager, require_admin, require_hr_manager_or_self
 from app.schemas.employee import EmployeeCreate, EmployeeUpdate, EmployeeOut, EmployeePage, EmploymentStatus
 from app.schemas.contract import ContractOut
 from app.schemas.attendance import AttendanceOut
@@ -17,7 +18,7 @@ ALLOWED_LIMITS = {10, 25, 50, 100}
 DEFAULT_LIMIT = 10
 
 
-@router.get("", response_model=EmployeePage, dependencies=[Depends(require_hr_manager)])
+@router.get("", response_model=EmployeePage)
 def list_employees(
     department: Optional[str] = Query(None),
     employment_status: Optional[EmploymentStatus] = Query(None),
@@ -26,6 +27,7 @@ def list_employees(
     page: int = Query(1),
     limit: int = Query(DEFAULT_LIMIT),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     # Resolve effective employment_status filter
     # `status` param (active/inactive/all) takes precedence over `employment_status`

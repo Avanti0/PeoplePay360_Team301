@@ -16,7 +16,11 @@ import {
   DepartmentSalaryCost,
   MonthlySalaryTrend,
   DashboardAlert,
-  RoleName
+  RoleName,
+  BulkContractCreateData,
+  BulkContractUpdateData,
+  BulkContractDeleteData,
+  BulkOperationResult
 } from '../types';
 import {
   initialEmployees,
@@ -569,6 +573,154 @@ function handleMockRoutes(endpoint: string, method: string, body: any): any {
   }
 
   // Contracts
+  if (endpoint === '/contracts/bulk-create' && method === 'POST') {
+    const employeeIds = body.employee_ids || body.employeeIds || [];
+    const successIds: string[] = [];
+    const failures: any[] = [];
+    for (const empId of employeeIds) {
+      const emp = employeesStore.find((e) => String(e.id) === String(empId));
+      const statusVal = body.status || 'draft';
+      if (statusVal === 'active') {
+        const overlap = contractsStore.find((c) => String(c.employeeId) === String(empId) && c.status === 'active');
+        if (overlap) {
+          failures.push({
+            id: String(empId),
+            name: emp?.name || 'Employee',
+            reason: `Overlapping active contract already exists (#${overlap.id})`,
+          });
+          continue;
+        }
+      }
+      const newContract: Contract = {
+        id: String(Date.now() + Math.floor(Math.random() * 1000)),
+        employeeId: String(empId),
+        employeeName: emp?.name,
+        dateStart: body.date_start || body.dateStart || new Date().toISOString().split('T')[0],
+        dateEnd: body.date_end || body.dateEnd || null,
+        wage: Number(body.wage) || 50000,
+        department: body.department || emp?.department,
+        jobPosition: body.job_position || body.jobPosition || emp?.jobPosition,
+        workingScheduleId: body.working_schedule_id || body.workingScheduleId || emp?.workingScheduleId,
+        salaryStructureId: body.salary_structure_id || body.salaryStructureId || null,
+        status: statusVal,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      contractsStore.unshift(newContract);
+      successIds.push(newContract.id);
+    }
+    return {
+      operation: 'bulk_create',
+      total: employeeIds.length,
+      successCount: successIds.length,
+      failedCount: failures.length,
+      successIds,
+      failures,
+    };
+  }
+
+  if (endpoint === '/contracts/bulk-update' && (method === 'PATCH' || method === 'POST' || method === 'PUT')) {
+    const contractIds = body.contract_ids || body.contractIds || [];
+    const successIds: string[] = [];
+    const failures: any[] = [];
+    for (const cid of contractIds) {
+      const contract = contractsStore.find((c) => String(c.id) === String(cid));
+      if (!contract) {
+        failures.push({ id: String(cid), name: 'Unknown Contract', reason: 'Contract record not found' });
+        continue;
+      }
+      const emp = employeesStore.find((e) => String(e.id) === String(contract.employeeId));
+      const empName = contract.employeeName || emp?.name || 'Employee';
+
+      if (contract.status === 'expired' || contract.status === 'cancelled') {
+        if (!body.update_status && !body.updateStatus) {
+          failures.push({ id: String(cid), name: empName, reason: 'Expired/cancelled contracts cannot be edited' });
+          continue;
+        }
+      }
+
+      if (body.update_date_start || body.updateDateStart) {
+        contract.dateStart = body.date_start || body.dateStart || contract.dateStart;
+      }
+      if (body.update_date_end || body.updateDateEnd) {
+        contract.dateEnd = body.date_end !== undefined ? body.date_end : (body.dateEnd !== undefined ? body.dateEnd : null);
+      }
+      if (body.update_wage || body.updateWage) {
+        contract.wage = Number(body.wage !== undefined ? body.wage : contract.wage);
+      }
+      if (body.update_department || body.updateDepartment) {
+        contract.department = body.department !== undefined ? body.department : contract.department;
+      }
+      if (body.update_job_position || body.updateJobPosition) {
+        contract.jobPosition = body.job_position || body.jobPosition || contract.jobPosition;
+      }
+      if (body.update_working_schedule_id || body.updateWorkingScheduleId) {
+        contract.workingScheduleId = body.working_schedule_id || body.workingScheduleId || contract.workingScheduleId;
+      }
+      if (body.update_salary_structure_id || body.updateSalaryStructureId) {
+        contract.salaryStructureId = body.salary_structure_id || body.salaryStructureId || contract.salaryStructureId;
+      }
+      if (body.update_status || body.updateStatus) {
+        contract.status = body.status || contract.status;
+      }
+      contract.updatedAt = new Date().toISOString();
+      successIds.push(contract.id);
+    }
+    return {
+      operation: 'bulk_update',
+      total: contractIds.length,
+      successCount: successIds.length,
+      failedCount: failures.length,
+      successIds,
+      failures,
+    };
+  }
+
+  if (endpoint === '/contracts/bulk-delete' && method === 'POST') {
+    const contractIds = body.contract_ids || body.contractIds || [];
+    const successIds: string[] = [];
+    const failures: any[] = [];
+    for (const cid of contractIds) {
+      const contract = contractsStore.find((c) => String(c.id) === String(cid));
+      if (!contract) {
+        failures.push({ id: String(cid), name: 'Unknown Contract', reason: 'Contract record not found' });
+        continue;
+      }
+      const emp = employeesStore.find((e) => String(e.id) === String(contract.employeeId));
+      const empName = contract.employeeName || emp?.name || 'Employee';
+
+      const hasPayslips = payslipsStore.some((p) => String(p.contractId) === String(cid));
+      if (hasPayslips) {
+        failures.push({
+          id: String(cid),
+          name: empName,
+          reason: 'Cannot delete: Contract is referenced by historical payslip records.',
+        });
+        continue;
+      }
+
+      if (contract.status !== 'draft') {
+        failures.push({
+          id: String(cid),
+          name: empName,
+          reason: `Only draft contracts can be hard-deleted. Contract is in ${contract.status} state.`,
+        });
+        continue;
+      }
+
+      contractsStore = contractsStore.filter((c) => String(c.id) !== String(cid));
+      successIds.push(cid);
+    }
+    return {
+      operation: 'bulk_delete',
+      total: contractIds.length,
+      successCount: successIds.length,
+      failedCount: failures.length,
+      successIds,
+      failures,
+    };
+  }
+
   if (endpoint === '/contracts' && method === 'GET') {
     return contractsStore;
   }
@@ -631,11 +783,48 @@ function handleMockRoutes(endpoint: string, method: string, body: any): any {
 
   // Attendance
   if (endpoint === '/attendance' && method === 'GET') {
+    if (currentAuthUser && currentAuthUser.role === 'employee') {
+      const userEmpId = currentAuthUser.employeeId;
+      return attendanceStore.filter((a) => !userEmpId || String(a.employeeId) === String(userEmpId));
+    }
     return attendanceStore;
   }
 
   if (endpoint === '/attendance' && method === 'POST') {
+    let empId = body.employeeId;
+    if (currentAuthUser && currentAuthUser.role === 'employee') {
+      const userEmpId = currentAuthUser.employeeId;
+      if (empId && userEmpId && String(empId) !== String(userEmpId)) {
+        throw new Error('HTTP 403: You may only record attendance for yourself');
+      }
+      empId = userEmpId || empId;
+    }
+
     const checkIn = body.checkIn || new Date().toISOString();
+    const todayStr = checkIn.slice(0, 10);
+
+    const existingIdx = attendanceStore.findIndex(
+      (a) => String(a.employeeId) === String(empId) && a.checkIn?.slice(0, 10) === todayStr
+    );
+
+    if (existingIdx !== -1) {
+      const existing = attendanceStore[existingIdx];
+      if (!existing.checkOut) {
+        const checkOut = body.checkOut || new Date().toISOString();
+        const worked = Math.round(((new Date(checkOut).getTime() - new Date(existing.checkIn!).getTime()) / 3600000) * 100) / 100;
+        const updated: AttendanceRecord = {
+          ...existing,
+          checkOut,
+          workedHours: worked,
+          note: body.note ? `${existing.note || ''} | ${body.note}`.trim() : existing.note,
+        };
+        attendanceStore[existingIdx] = updated;
+        return updated;
+      } else {
+        throw new Error('HTTP 400: Attendance record already exists and is completed for this date');
+      }
+    }
+
     const checkOut = body.checkOut || null;
     let worked: number | null = null;
     if (checkIn && checkOut) {
@@ -644,6 +833,7 @@ function handleMockRoutes(endpoint: string, method: string, body: any): any {
     const newAtt: AttendanceRecord = {
       ...body,
       id: String(Date.now()),
+      employeeId: empId,
       checkIn,
       checkOut,
       workedHours: worked,
@@ -1050,6 +1240,21 @@ export const api = {
     delete: (id: string | number) =>
       request<{ success: boolean }>(`/contracts/${id}`, {
         method: 'DELETE',
+      }),
+    bulkCreate: (data: BulkContractCreateData) =>
+      request<BulkOperationResult>('/contracts/bulk-create', {
+        method: 'POST',
+        body: JSON.stringify(camelToSnake(data)),
+      }),
+    bulkUpdate: (data: BulkContractUpdateData) =>
+      request<BulkOperationResult>('/contracts/bulk-update', {
+        method: 'PATCH',
+        body: JSON.stringify(camelToSnake(data)),
+      }),
+    bulkDelete: (data: BulkContractDeleteData) =>
+      request<BulkOperationResult>('/contracts/bulk-delete', {
+        method: 'POST',
+        body: JSON.stringify(camelToSnake(data)),
       }),
   },
 
