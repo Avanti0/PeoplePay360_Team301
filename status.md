@@ -73,13 +73,13 @@ This file lives on `main`. Update it every time you reach a meaningful commit po
 
 ### Status Enums
 
-| Entity   | Values                                      |
-|----------|---------------------------------------------|
-| Contract | `draft`, `active`, `expired`, `cancelled`   |
-| Payrun   | `draft`, `computed`, `validated`, `paid`    |
-| Payslip  | `draft`, `computed`, `validated`, `paid`    |
-| Leave    | `draft`, `confirmed`, `approved`, `refused` |
-| Allocation | `draft`, `confirmed`, `approved`, `refused` |
+| Entity     | Values                                      |
+|------------|---------------------------------------------|
+| Contract   | `draft`, `active`, `expired`, `cancelled`  |
+| Payrun     | `draft`, `computed`, `validated`, `paid`   |
+| Payslip    | `draft`, `computed`, `validated`, `paid`   |
+| Leave      | `draft`, `confirmed`, `approved`, `refused`|
+| Allocation | `draft`, `confirmed`, `approved`, `refused`|
 
 ---
 
@@ -87,47 +87,38 @@ This file lives on `main`. Update it every time you reach a meaningful commit po
 
 | Module                  | Database         | Backend          | Frontend         |
 |-------------------------|------------------|------------------|------------------|
-| Employee Management     | ⬜ Not started   | 🔄 In progress   | ⬜ Not started   |
-| Contract Management     | ⬜ Not started   | 🔄 In progress   | ⬜ Not started   |
-| Working Schedules       | ⬜ Not started   | ⬜ Not started   | ⬜ Not started   |
-| Attendance              | ⬜ Not started   | 🔄 In progress   | ⬜ Not started   |
-| Time Off                | ⬜ Not started   | 🔄 In progress   | ⬜ Not started   |
-| Salary Structures/Rules | ⬜ Not started   | ⬜ Not started   | ⬜ Not started   |
-| Payrun Processing       | ⬜ Not started   | ⬜ Not started   | ⬜ Not started   |
+| Employee Management     | ✅ Done          | 🔄 In progress   | ✅ Done          |
+| Contract Management     | ✅ Done          | 🔄 In progress   | ✅ Done          |
+| Working Schedules       | ✅ Done          | ⬜ Not started   | ✅ Done          |
+| Attendance              | ✅ Done          | 🔄 In progress   | ✅ Done          |
+| Time Off                | ✅ Done          | 🔄 In progress   | ⬜ Not started   |
+| Salary Structures/Rules | ✅ Done          | ⬜ Not started   | ✅ Done          |
+| Payrun Processing       | ✅ Done          | ⬜ Not started   | ✅ Done          |
 | Payslip Generation      | ⬜ Not started   | ⬜ Not started   | ⬜ Not started   |
-| Payroll Dashboard       | ⬜ Not started   | ⬜ Not started   | ⬜ Not started   |
-| Auth / RBAC             | ⬜ Not started   | 🔄 In progress   | ⬜ Not started   |
+| Payroll Dashboard       | ⬜ Not started   | ⬜ Not started   | ✅ Done          |
+| Auth / RBAC             | ✅ Done          | 🔄 In progress   | ✅ Done          |
 
-Backend note: models + CRUD/RBAC routers exist for Employee/Contract/Attendance/Time Off
-(incl. the leave-approval → balance-deduction flow) and match `feature/database`'s real
-`schema.sql`. Marked "In progress" rather than "Done" — not yet smoke-tested against a
-live Postgres instance. Salary Structures/Rules and the Payrun engine are next.
+### Backend Progress
 
-Status key: ⬜ Not started | 🔄 In progress | ✅ Done | 🔀 Merged to main
+Models + CRUD/RBAC routers exist for:
 
----
+- Employee
+- Contract
+- Attendance
+- Time Off
 
-## Merge Log
+The Time Off module includes the leave-approval → balance-deduction flow and matches the real `feature/database` `schema.sql`.
 
-| Date | Branch | Merged by | What was merged |
-|------|--------|-----------|-----------------|
-|      |        |           |                 |
+Backend modules are marked **In Progress** rather than **Done** because they have not yet been fully smoke-tested against a live PostgreSQL instance.
 
----
+Salary Structures/Rules and the Payrun engine are next.
 
-## Open Decisions / Blockers
+### Database Progress
 
-| # | Raised by | Question / Blocker              | Status |
-|---|-----------|---------------------------------|--------|
-| 1 |           | PDF library choice (TBD)        | Open   |
-| 2 |           | Email service choice (TBD)      | Open   |
+`schema.sql` + `seed.sql` cover the HR and payroll modules except the Payroll Dashboard, which does not require dedicated tables because it queries existing data.
 
----
+The database implementation has been verified against a local PostgreSQL 18 installation using:
 
-## How to Update This File
-
-When you reach a meaningful commit:
-1. Update **Module Progress** rows for what you completed
-2. Finalize any **TBD** entries in Tech Stack or Naming
-3. Add a row to **Merge Log** when merging to main
-4. Commit alongside your code: `git commit -m "status: <what changed>"`
+```text
+npm run reset
+npm run verify
