@@ -1,17 +1,20 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { User, RoleName } from '../types';
 import { api, setAccessToken, setCurrentUser } from '../services/api';
 import { demoUsers } from '../services/mockData';
 
-interface AuthContextType {
+export interface AuthContextType {
   user: User | null;
   role: RoleName;
   isAuthenticated: boolean;
   isLoading: boolean;
+  error: string | null;
   login: (username: string, password?: string, role?: RoleName) => Promise<void>;
   logout: () => Promise<void>;
+  refreshAuth: () => Promise<boolean>;
   switchUserRole: (role: RoleName) => void;
   hasRole: (requiredRole: RoleName) => boolean;
+  clearError: () => void;
 }
 
 const ROLE_HIERARCHY: Record<RoleName, number> = {
@@ -25,25 +28,68 @@ const ROLE_HIERARCHY: Record<RoleName, number> = {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Default to Admin in demo mode so full features are visible immediately
+  // Authentication states: loading, authenticated, unauthenticated
   const [user, setUser] = useState<User | null>(demoUsers[0]);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
+  const clearError = useCallback(() => {
+    setError(null);
+  }, []);
+
+  // Check and restore session on mount (silent refresh / checkMe)
   useEffect(() => {
-    // Initial token & user setup
-    setCurrentUser(user);
-    if (user) {
-      setAccessToken('in_memory_jwt_' + user.role);
-    }
-  }, [user]);
+    let isMounted = true;
+
+    const initializeAuth = async () => {
+      try {
+        setIsLoading(true);
+        // Attempt silent refresh against backend cookie / session
+        const refreshed = await api.auth.refresh().catch(() => false);
+        if (refreshed && isMounted) {
+          const me = await api.auth.getMe().catch(() => null);
+          if (me) {
+            setUser(me);
+            setCurrentUser(me);
+            return;
+          }
+        }
+
+        // If backend session not present, retain default demo admin or mock user
+        if (isMounted && user) {
+          setCurrentUser(user);
+          setAccessToken('in_memory_jwt_' + user.role);
+        }
+      } catch (err: any) {
+        if (isMounted) {
+          console.warn('Initial session check resolved to unauthenticated state:', err);
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    initializeAuth();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const login = async (username: string, password?: string, role?: RoleName) => {
     setIsLoading(true);
+    setError(null);
     try {
       const response = await api.auth.login({ username, password, role });
       setUser(response.user);
       setCurrentUser(response.user);
       setAccessToken(response.accessToken);
+    } catch (err: any) {
+      const msg = err?.message || 'Authentication failed. Please check your credentials.';
+      setError(msg);
+      throw err;
     } finally {
       setIsLoading(false);
     }
@@ -51,11 +97,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = async () => {
     setIsLoading(true);
+    setError(null);
     try {
       await api.auth.logout();
+    } catch (err) {
+      console.warn('Logout endpoint failed, proceeding with local state purge:', err);
+    } finally {
       setUser(null);
       setCurrentUser(null);
       setAccessToken(null);
+      setIsLoading(false);
+    }
+  };
+
+  const refreshAuth = async (): Promise<boolean> => {
+    setIsLoading(true);
+    try {
+      const res = await api.auth.refresh();
+      if (res && res.accessToken) {
+        setAccessToken(res.accessToken);
+        return true;
+      }
+      return false;
+    } catch (err: any) {
+      setError(err?.message || 'Session refresh failed');
+      return false;
     } finally {
       setIsLoading(false);
     }
@@ -88,10 +154,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         role: user?.role || 'employee',
         isAuthenticated: !!user,
         isLoading,
+        error,
         login,
         logout,
+        refreshAuth,
         switchUserRole,
         hasRole,
+        clearError,
       }}
     >
       {children}

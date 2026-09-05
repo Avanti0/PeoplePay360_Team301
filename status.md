@@ -113,6 +113,7 @@ Status key: ⬜ Not started | 🔄 In progress | ✅ Done | 🔀 Merged to main
 
 | Date       | Branch             | Merged by            | What was merged |
 |------------|--------------------|----------------------|-----------------|
+| 2026-09-05 | `feature/frontend` | T. Lakshmi Vyshnavi  | Frontend Auth State (Complete AuthContext supporting authenticated, unauthenticated, loading, and logout states, silent startup session refresh/restore, in-memory token management, and LoadingState protected route guard) |
 | 2026-09-05 | `feature/database` | Maddi Soumya         | Full schema.sql + seed.sql (all tables, constraints, triggers, demo data) |
 | 2026-09-05 | `feature/frontend` | T. Lakshmi Vyshnavi  | Login UI (Form validation, loading state, invalid credentials banner, API error handling, demo persona quick login, password toggle) |
 | 2026-09-05 | `feature/frontend` | T. Lakshmi Vyshnavi  | Frontend Routes (Complete route suite: `/dashboard`, `/employees`, `/employees/:id`, `/contracts`, `/contracts/:id`, `/working-schedules`, `/attendance`, `/time-off/types`, `/time-off/allocations`, `/time-off/requests`, `/salary-structures`, `/salary-rules`, `/payruns`, `/payruns/:id`, `/payslips`, `/payslips/:id`) |

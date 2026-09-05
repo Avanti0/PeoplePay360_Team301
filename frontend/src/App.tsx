@@ -21,11 +21,19 @@ import { PayrunDetailPage } from './pages/payruns/PayrunDetailPage';
 import { PayslipsPage } from './pages/payslips/PayslipsPage';
 import { PayslipDetailPage } from './pages/payslips/PayslipDetailPage';
 
+import { LoadingState } from './components/common/LoadingState';
+
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
+
+  if (isLoading) {
+    return <LoadingState message="Verifying authentication session..." fullPage />;
+  }
+
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
+
   return <>{children}</>;
 };
 

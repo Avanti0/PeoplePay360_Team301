@@ -242,6 +242,18 @@ function handleMockRoutes(endpoint: string, method: string, body: any): any {
     };
   }
 
+  if (endpoint === '/auth/refresh' && method === 'POST') {
+    if (currentAuthUser) {
+      inMemoryAccessToken = 'mock_refreshed_jwt_' + Date.now();
+      return {
+        accessToken: inMemoryAccessToken,
+        tokenType: 'bearer',
+        user: currentAuthUser,
+      };
+    }
+    throw new Error('Unauthenticated');
+  }
+
   if (endpoint === '/auth/logout' && method === 'POST') {
     inMemoryAccessToken = null;
     currentAuthUser = null;
