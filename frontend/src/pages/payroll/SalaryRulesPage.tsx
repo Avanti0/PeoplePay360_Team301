@@ -29,7 +29,7 @@ export const SalaryRulesPage: React.FC = () => {
 
   // New Rule Modal
   const [isRuleModalOpen, setIsRuleModalOpen] = useState(false);
-  const [ruleStructureId, setRuleStructureId] = useState<number>(1);
+  const [ruleStructureId, setRuleStructureId] = useState<string>('1');
   const [ruleName, setRuleName] = useState('');
   const [ruleCode, setRuleCode] = useState('');
   const [ruleCategory, setRuleCategory] = useState<any>('allowance');
@@ -156,7 +156,7 @@ export const SalaryRulesPage: React.FC = () => {
             <option value="all">All Structures</option>
             {structures.map((s) => (
               <option key={s.id} value={s.id}>
-                {s.name} ({s.code || 'REG'})
+                {s.name}
               </option>
             ))}
           </select>
@@ -255,12 +255,12 @@ export const SalaryRulesPage: React.FC = () => {
             <label className="block text-xs font-bold text-slate-700 mb-1">Target Structure</label>
             <select
               value={ruleStructureId}
-              onChange={(e) => setRuleStructureId(Number(e.target.value))}
+              onChange={(e) => setRuleStructureId(e.target.value)}
               className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
             >
               {structures.map((s) => (
                 <option key={s.id} value={s.id}>
-                  {s.name} ({s.code || 'REG'})
+                  {s.name}
                 </option>
               ))}
             </select>

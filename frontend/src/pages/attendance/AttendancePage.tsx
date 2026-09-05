@@ -35,7 +35,7 @@ export const AttendancePage: React.FC = () => {
 
   // Quick Punch Modal / State
   const [isPunchModalOpen, setIsPunchModalOpen] = useState(false);
-  const [punchEmployeeId, setPunchEmployeeId] = useState<number>(2);
+  const [punchEmployeeId, setPunchEmployeeId] = useState<string>('2');
 
   useEffect(() => {
     loadAttendance();
@@ -58,9 +58,7 @@ export const AttendancePage: React.FC = () => {
   };
 
   const filteredRecords = records.filter((r) => {
-    const matchesSearch =
-      (r.employeeName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (r.employeeCode || '').toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = (r.employeeName || '').toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === 'all' || r.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
@@ -78,11 +76,11 @@ export const AttendancePage: React.FC = () => {
     if (!selectedRecord) return;
 
     try {
-      const date = selectedRecord.workDate;
+      const date = (selectedRecord.checkIn || new Date().toISOString()).slice(0, 10);
       const fullCheckIn = `${date}T${correctionCheckIn}:00Z`;
       const fullCheckOut = correctionCheckOut ? `${date}T${correctionCheckOut}:00Z` : null;
 
-      const updated = await api.attendance.update(selectedRecord.id, {
+      await api.attendance.update(selectedRecord.id, {
         checkIn: fullCheckIn,
         checkOut: fullCheckOut,
         status: correctionStatus,
@@ -104,9 +102,7 @@ export const AttendancePage: React.FC = () => {
       await api.attendance.create({
         employeeId: punchEmployeeId,
         employeeName: emp?.name,
-        employeeCode: emp?.employeeCode,
-        departmentName: emp?.departmentName,
-        workDate: new Date().toISOString().split('T')[0],
+        departmentName: emp?.department,
         checkIn: new Date().toISOString(),
         status: 'present',
       });
@@ -204,10 +200,12 @@ export const AttendancePage: React.FC = () => {
                   <td className="py-3 px-4">
                     <div>
                       <p className="font-bold text-slate-900">{r.employeeName}</p>
-                      <p className="text-[10px] text-slate-400">{r.employeeCode}</p>
+                      <p className="text-[10px] text-slate-400">{r.departmentName}</p>
                     </div>
                   </td>
-                  <td className="py-3 px-4 font-semibold text-slate-800">{r.workDate}</td>
+                  <td className="py-3 px-4 font-semibold text-slate-800">
+                    {r.checkIn ? new Date(r.checkIn).toLocaleDateString() : '-'}
+                  </td>
                   <td className="py-3 px-4 text-slate-600">
                     {r.checkIn ? (
                       <span className="font-mono">
@@ -229,14 +227,14 @@ export const AttendancePage: React.FC = () => {
                   <td className="py-3 px-4">
                     <span
                       className={`font-bold px-2 py-0.5 rounded text-xs ${
-                        r.workedHours >= 8
+                        (r.workedHours ?? 0) >= 8
                           ? 'bg-blue-50 text-blue-700'
-                          : r.workedHours > 0
+                          : (r.workedHours ?? 0) > 0
                           ? 'bg-slate-100 text-slate-700'
                           : 'bg-rose-50 text-rose-700'
                       }`}
                     >
-                      {r.workedHours} hrs
+                      {r.workedHours ?? '-'} hrs
                     </span>
                   </td>
                   <td className="py-3 px-4">
@@ -365,12 +363,12 @@ export const AttendancePage: React.FC = () => {
             <label className="block text-xs font-bold text-slate-700 mb-1">Select Employee</label>
             <select
               value={punchEmployeeId}
-              onChange={(e) => setPunchEmployeeId(Number(e.target.value))}
+              onChange={(e) => setPunchEmployeeId(e.target.value)}
               className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
             >
               {employees.map((e) => (
                 <option key={e.id} value={e.id}>
-                  {e.firstName} {e.lastName} ({e.employeeCode})
+                  {e.name}
                 </option>
               ))}
             </select>

@@ -130,7 +130,7 @@ export const PayslipDetailPage: React.FC = () => {
             <span className="font-bold text-slate-900 text-sm mt-0.5 block">
               {payslip.employeeName}
             </span>
-            <span className="text-[11px] text-slate-500">{payslip.employeeCode}</span>
+            
           </div>
 
           <div>
@@ -227,7 +227,7 @@ export const PayslipDetailPage: React.FC = () => {
                 <div className="px-4 py-2.5 flex justify-between items-center">
                   <span className="font-semibold text-slate-800">Statutory Deductions</span>
                   <span className="font-mono font-bold text-rose-600">
-                    {formatCurrency(payslip.totalDeductions)}
+                    {formatCurrency(payslip.grossSalary - payslip.netSalary)}
                   </span>
                 </div>
               )}
@@ -235,7 +235,7 @@ export const PayslipDetailPage: React.FC = () => {
             <div className="bg-slate-50/60 border-t border-slate-200 px-4 py-3 flex justify-between items-center text-xs font-bold">
               <span className="text-slate-800">Total Deductions:</span>
               <span className="text-rose-600 font-mono font-black text-sm">
-                {formatCurrency(payslip.totalDeductions)}
+                {formatCurrency(payslip.grossSalary - payslip.netSalary)}
               </span>
             </div>
           </div>

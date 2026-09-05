@@ -14,7 +14,7 @@ import {
   DashboardKPIs,
   DepartmentSalaryCost,
   MonthlySalaryTrend,
-  PayrollWarning,
+  DashboardAlert,
   RoleName
 } from '../types';
 import {
@@ -207,7 +207,7 @@ function handleMockRoutes(endpoint: string, method: string, body: any): any {
   // Auth
   if (endpoint === '/auth/login' && method === 'POST') {
     const user = demoUsers.find((u) => u.username === body?.username) || {
-      id: 99,
+      id: '99',
       username: body?.username || 'demo.user',
       role: (body?.role || 'employee') as RoleName,
       employeeName: 'Demo User',
@@ -249,7 +249,7 @@ function handleMockRoutes(endpoint: string, method: string, body: any): any {
         ? Math.round((presentCount / totalAttendance) * 100)
         : 92,
       activeEmployeesCount: employeesStore.filter((e) => e.employmentStatus === 'active').length,
-      pendingLeaveRequestsCount: timeOffRequestsStore.filter((r) => r.status === 'submitted' || r.status === 'draft').length,
+      pendingLeaveRequestsCount: timeOffRequestsStore.filter((r) => r.status === 'confirmed' || r.status === 'draft').length,
       unresolvedWarningsCount: 1, // Ishaan missing bank details
     };
     return kpis;
@@ -277,24 +277,23 @@ function handleMockRoutes(endpoint: string, method: string, body: any): any {
   }
 
   if (endpoint === '/dashboard/alerts' && method === 'GET') {
-    return [
+    const alerts: DashboardAlert[] = [
       {
-        id: 1,
-        payslipId: 0,
+        id: '1',
         warningType: 'missing_bank_details',
-        employeeId: 8,
-        employeeName: 'Ishaan Kapoor (EMP-008)',
+        employeeId: '8',
+        employeeName: 'Ishaan Kapoor',
         message: 'Employee is missing bank account details for payroll payout.',
       },
       {
-        id: 2,
-        payslipId: 0,
+        id: '2',
         warningType: 'missing_punch',
-        employeeId: 8,
-        employeeName: 'Ishaan Kapoor (EMP-008)',
+        employeeId: '8',
+        employeeName: 'Ishaan Kapoor',
         message: 'Missing attendance check-out punch on 2026-09-03.',
-      }
+      },
     ];
+    return alerts;
   }
 
   // Employees
@@ -323,9 +322,8 @@ function handleMockRoutes(endpoint: string, method: string, body: any): any {
   if (endpoint === '/employees' && method === 'POST') {
     const newEmp: Employee = {
       ...body,
-      id: Date.now(),
-      employeeCode: body.employeeCode || `EMP-00${employeesStore.length + 1}`,
-      name: `${body.firstName} ${body.lastName}`,
+      id: String(Date.now()),
+      employmentStatus: body.employmentStatus || 'active',
     };
     employeesStore.unshift(newEmp);
     return newEmp;
@@ -358,7 +356,7 @@ function handleMockRoutes(endpoint: string, method: string, body: any): any {
   if (endpoint === '/contracts' && method === 'POST') {
     const newContract: Contract = {
       ...body,
-      id: Date.now(),
+      id: String(Date.now()),
     };
     contractsStore.unshift(newContract);
     return newContract;
@@ -391,7 +389,7 @@ function handleMockRoutes(endpoint: string, method: string, body: any): any {
   if (endpoint === '/working-schedules' && method === 'POST') {
     const newSched: WorkingSchedule = {
       ...body,
-      id: Date.now(),
+      id: String(Date.now()),
       weeklyHours: body.weeklyHours || 40,
     };
     schedulesStore.push(newSched);
@@ -414,14 +412,13 @@ function handleMockRoutes(endpoint: string, method: string, body: any): any {
   if (endpoint === '/attendance' && method === 'POST') {
     const checkIn = body.checkIn || new Date().toISOString();
     const checkOut = body.checkOut || null;
-    let worked = 0;
+    let worked: number | null = null;
     if (checkIn && checkOut) {
       worked = Math.round(((new Date(checkOut).getTime() - new Date(checkIn).getTime()) / 3600000) * 100) / 100;
     }
     const newAtt: AttendanceRecord = {
       ...body,
-      id: Date.now(),
-      workDate: body.workDate || new Date().toISOString().split('T')[0],
+      id: String(Date.now()),
       checkIn,
       checkOut,
       workedHours: worked,
@@ -445,7 +442,6 @@ function handleMockRoutes(endpoint: string, method: string, body: any): any {
             ...body,
             workedHours: worked ?? a.workedHours,
             isManual: true,
-            correctedByName: currentAuthUser?.employeeName || 'HR Admin',
           }
         : a
     );
@@ -458,7 +454,7 @@ function handleMockRoutes(endpoint: string, method: string, body: any): any {
   }
 
   if (endpoint === '/time-off-types' && method === 'POST') {
-    const newType: TimeOffType = { ...body, id: Date.now() };
+    const newType: TimeOffType = { ...body, id: String(Date.now()) };
     timeOffTypesStore.push(newType);
     return newType;
   }
@@ -471,7 +467,7 @@ function handleMockRoutes(endpoint: string, method: string, body: any): any {
   if (endpoint === '/allocations' && method === 'POST') {
     const newAlloc: Allocation = {
       ...body,
-      id: Date.now(),
+      id: String(Date.now()),
       taken: 0,
       remaining: body.numberOfDays,
       status: body.status || 'draft',
@@ -496,8 +492,8 @@ function handleMockRoutes(endpoint: string, method: string, body: any): any {
   if (endpoint === '/time-off-requests' && method === 'POST') {
     const newReq: TimeOffRequest = {
       ...body,
-      id: Date.now(),
-      status: 'submitted',
+      id: String(Date.now()),
+      status: 'confirmed',
       createdAt: new Date().toISOString(),
     };
     timeOffRequestsStore.unshift(newReq);
@@ -509,8 +505,6 @@ function handleMockRoutes(endpoint: string, method: string, body: any): any {
     const req = timeOffRequestsStore.find((r) => String(r.id) === String(id));
     if (req) {
       req.status = 'approved';
-      req.approvedByName = currentAuthUser?.employeeName || 'HR Manager';
-      req.approvedAt = new Date().toISOString();
 
       // Deduct balance from allocation per Business Rule 4
       if (req.allocationId) {
@@ -542,7 +536,7 @@ function handleMockRoutes(endpoint: string, method: string, body: any): any {
   }
 
   if (endpoint === '/salary-structures' && method === 'POST') {
-    const newStruct: SalaryStructure = { ...body, id: Date.now() };
+    const newStruct: SalaryStructure = { ...body, id: String(Date.now()) };
     salaryStructuresStore.push(newStruct);
     return newStruct;
   }
@@ -552,7 +546,7 @@ function handleMockRoutes(endpoint: string, method: string, body: any): any {
   }
 
   if (endpoint === '/salary-rules' && method === 'POST') {
-    const newRule: SalaryRule = { ...body, id: Date.now() };
+    const newRule: SalaryRule = { ...body, id: String(Date.now()) };
     salaryRulesStore.push(newRule);
     return newRule;
   }
@@ -578,7 +572,7 @@ function handleMockRoutes(endpoint: string, method: string, body: any): any {
   if (endpoint === '/payruns' && method === 'POST') {
     const newPayrun: Payrun = {
       ...body,
-      id: Date.now(),
+      id: String(Date.now()),
       status: 'draft',
       employeeCount: body.employeeIds?.length || employeesStore.length,
       totalGross: 0,
@@ -597,7 +591,7 @@ function handleMockRoutes(endpoint: string, method: string, body: any): any {
     const payrun = payrunsStore.find((p) => String(p.id) === String(id));
     if (payrun) {
       payrun.status = 'computed';
-      payrun.computedAt = new Date().toISOString();
+      payrun.updatedAt = new Date().toISOString();
 
       // Compute payslips for active employees matching period
       let grossSum = 0;
@@ -617,10 +611,9 @@ function handleMockRoutes(endpoint: string, method: string, body: any): any {
             (!c.dateEnd || c.dateEnd >= payrun.periodEnd)
         ) || contractsStore.find((c) => String(c.employeeId) === String(emp.id) && c.status === 'active');
 
-        const wage = contract?.wage || 600000;
-        const monthlyBase = wage / 12;
+        const monthlyWage = contract?.wage || 50000;
 
-        const basic = Math.round(monthlyBase * 0.5);
+        const basic = Math.round(monthlyWage * 0.5);
         const hra = Math.round(basic * 0.4);
         const trans = 3000;
         const gross = basic + hra + trans;
@@ -639,15 +632,15 @@ function handleMockRoutes(endpoint: string, method: string, body: any): any {
           warnings.push('Employee missing bank account details.');
         }
 
+        const slipId = String(Date.now() + Math.floor(Math.random() * 10000));
         newSlips.push({
-          id: Date.now() + Math.floor(Math.random() * 10000),
+          id: slipId,
           payrunId: payrun.id,
           payrunName: payrun.name,
           employeeId: emp.id,
-          employeeName: emp.name || `${emp.firstName} ${emp.lastName}`,
-          employeeCode: emp.employeeCode,
-          departmentName: emp.departmentName,
-          jobPositionTitle: emp.jobTitle,
+          employeeName: emp.name,
+          departmentName: emp.department,
+          jobPositionTitle: emp.jobPosition,
           bankAccountNumber: emp.bankAccountNumber,
           bankName: emp.bankName,
           contractId: contract?.id,
@@ -655,19 +648,18 @@ function handleMockRoutes(endpoint: string, method: string, body: any): any {
           periodEnd: payrun.periodEnd,
           workedDays: 22,
           grossSalary: gross,
-          totalDeductions: deductions,
           netSalary: net,
           status: 'computed',
           warnings,
           lines: [
-            { id: 1, payslipId: 0, code: 'BASIC', name: 'Basic Salary', category: 'basic', sequence: 10, amount: basic },
-            { id: 2, payslipId: 0, code: 'HRA', name: 'House Rent Allowance (HRA)', category: 'allowance', sequence: 20, amount: hra },
-            { id: 3, payslipId: 0, code: 'TRANS', name: 'Transport Allowance', category: 'allowance', sequence: 30, amount: trans },
-            { id: 4, payslipId: 0, code: 'GROSS', name: 'Gross Salary', category: 'gross', sequence: 40, amount: gross },
-            { id: 5, payslipId: 0, code: 'PF', name: 'Provident Fund (PF)', category: 'deduction', sequence: 50, amount: pf },
-            { id: 6, payslipId: 0, code: 'PT', name: 'Professional Tax (PT)', category: 'deduction', sequence: 60, amount: pt },
-            { id: 7, payslipId: 0, code: 'TDS', name: 'Tax Deducted at Source (TDS)', category: 'deduction', sequence: 70, amount: tds },
-            { id: 8, payslipId: 0, code: 'NET', name: 'Net Salary', category: 'net', sequence: 80, amount: net },
+            { id: '1', payslipId: slipId, code: 'BASIC', name: 'Basic Salary', category: 'basic', sequence: 10, amount: basic },
+            { id: '2', payslipId: slipId, code: 'HRA', name: 'House Rent Allowance (HRA)', category: 'allowance', sequence: 20, amount: hra },
+            { id: '3', payslipId: slipId, code: 'TRANS', name: 'Transport Allowance', category: 'allowance', sequence: 30, amount: trans },
+            { id: '4', payslipId: slipId, code: 'GROSS', name: 'Gross Salary', category: 'gross', sequence: 40, amount: gross },
+            { id: '5', payslipId: slipId, code: 'PF', name: 'Provident Fund (PF)', category: 'deduction', sequence: 50, amount: pf },
+            { id: '6', payslipId: slipId, code: 'PT', name: 'Professional Tax (PT)', category: 'deduction', sequence: 60, amount: pt },
+            { id: '7', payslipId: slipId, code: 'TDS', name: 'Tax Deducted at Source (TDS)', category: 'deduction', sequence: 70, amount: tds },
+            { id: '8', payslipId: slipId, code: 'NET', name: 'Net Salary', category: 'net', sequence: 80, amount: net },
           ],
         });
       }
@@ -692,7 +684,7 @@ function handleMockRoutes(endpoint: string, method: string, body: any): any {
     const payrun = payrunsStore.find((p) => String(p.id) === String(id));
     if (payrun) {
       payrun.status = 'validated';
-      payrun.validatedAt = new Date().toISOString();
+      payrun.updatedAt = new Date().toISOString();
       payslipsStore = payslipsStore.map((s) =>
         String(s.payrunId) === String(payrun.id) ? { ...s, status: 'validated' } : s
       );
@@ -705,7 +697,7 @@ function handleMockRoutes(endpoint: string, method: string, body: any): any {
     const payrun = payrunsStore.find((p) => String(p.id) === String(id));
     if (payrun) {
       payrun.status = 'paid';
-      payrun.paidAt = new Date().toISOString();
+      payrun.updatedAt = new Date().toISOString();
       payslipsStore = payslipsStore.map((s) =>
         String(s.payrunId) === String(payrun.id) ? { ...s, status: 'paid' } : s
       );
@@ -715,10 +707,6 @@ function handleMockRoutes(endpoint: string, method: string, body: any): any {
 
   if (endpoint.includes('/send-payslips') && method === 'POST') {
     const id = endpoint.split('/')[2];
-    const now = new Date().toISOString();
-    payslipsStore = payslipsStore.map((s) =>
-      String(s.payrunId) === String(id) ? { ...s, emailedAt: now } : s
-    );
     return { success: true, count: payslipsStore.filter((s) => String(s.payrunId) === String(id)).length };
   }
 
@@ -932,7 +920,7 @@ export const api = {
     getKpis: () => request<DashboardKPIs>('/dashboard/kpis'),
     getSalaryByDept: () => request<DepartmentSalaryCost[]>('/dashboard/salary-by-dept'),
     getSalaryTrend: () => request<MonthlySalaryTrend[]>('/dashboard/salary-trend'),
-    getAlerts: () => request<PayrollWarning[]>('/dashboard/alerts'),
+    getAlerts: () => request<DashboardAlert[]>('/dashboard/alerts'),
   },
 
   departments: {

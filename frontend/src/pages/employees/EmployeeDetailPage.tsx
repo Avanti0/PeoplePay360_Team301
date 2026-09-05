@@ -130,19 +130,17 @@ export const EmployeeDetailPage: React.FC = () => {
       <div className="bg-white rounded-3xl border border-slate-200/80 p-6 md:p-8 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="flex items-center gap-5">
           <div className="w-20 h-20 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white font-black text-2xl flex items-center justify-center shadow-lg shadow-blue-500/20">
-            {employee.firstName.charAt(0)}
-            {employee.lastName.charAt(0)}
+            {employee.name.charAt(0)}
           </div>
           <div>
             <div className="flex items-center gap-3">
               <h2 className="text-2xl font-extrabold text-slate-900">
-                {employee.firstName} {employee.lastName}
+                {employee.name}
               </h2>
               <StatusBadge status={employee.employmentStatus} />
             </div>
             <p className="text-xs font-semibold text-slate-500 mt-1">
-              {employee.jobTitle || 'Team Member'} &bull; {employee.departmentName} &bull;{' '}
-              <span className="font-mono text-blue-600">{employee.employeeCode}</span>
+              {employee.jobPosition || 'Team Member'} &bull; {employee.department}
             </p>
             <div className="flex flex-wrap items-center gap-4 mt-3 text-xs text-slate-600">
               <div className="flex items-center gap-1.5">
@@ -155,10 +153,6 @@ export const EmployeeDetailPage: React.FC = () => {
                   <span>{employee.phone}</span>
                 </div>
               )}
-              <div className="flex items-center gap-1.5">
-                <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                <span>Joined {employee.dateJoined}</span>
-              </div>
             </div>
           </div>
         </div>
@@ -235,11 +229,11 @@ export const EmployeeDetailPage: React.FC = () => {
             <div className="grid grid-cols-2 gap-4 text-xs">
               <div>
                 <span className="text-slate-400 block font-medium">Department</span>
-                <span className="font-bold text-slate-900 mt-0.5 block">{employee.departmentName}</span>
+                <span className="font-bold text-slate-900 mt-0.5 block">{employee.department}</span>
               </div>
               <div>
                 <span className="text-slate-400 block font-medium">Position</span>
-                <span className="font-bold text-slate-900 mt-0.5 block">{employee.jobTitle || 'Team Member'}</span>
+                <span className="font-bold text-slate-900 mt-0.5 block">{employee.jobPosition || 'Team Member'}</span>
               </div>
               <div>
                 <span className="text-slate-400 block font-medium">Reports To</span>
@@ -302,7 +296,7 @@ export const EmployeeDetailPage: React.FC = () => {
                   <div>
                     <div className="flex items-center gap-2.5">
                       <span className="text-sm font-bold text-slate-900">
-                        {contract.jobPositionTitle || employee.jobTitle}
+                        {contract.jobPosition || employee.jobPosition}
                       </span>
                       <StatusBadge status={contract.status} />
                     </div>
@@ -358,14 +352,16 @@ export const EmployeeDetailPage: React.FC = () => {
                 ) : (
                   attendance.map((att) => (
                     <tr key={att.id} className="hover:bg-slate-50">
-                      <td className="py-2.5 px-4 font-bold text-slate-900">{att.workDate}</td>
+                      <td className="py-2.5 px-4 font-bold text-slate-900">
+                        {att.checkIn ? new Date(att.checkIn).toLocaleDateString() : '-'}
+                      </td>
                       <td className="py-2.5 px-4 text-slate-600">
                         {att.checkIn ? new Date(att.checkIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}
                       </td>
                       <td className="py-2.5 px-4 text-slate-600">
                         {att.checkOut ? new Date(att.checkOut).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}
                       </td>
-                      <td className="py-2.5 px-4 font-bold text-blue-600">{att.workedHours}h</td>
+                      <td className="py-2.5 px-4 font-bold text-blue-600">{att.workedHours ?? '-'}h</td>
                       <td className="py-2.5 px-4">
                         <StatusBadge status={att.status} />
                       </td>
@@ -413,7 +409,7 @@ export const EmployeeDetailPage: React.FC = () => {
                         {req.dateFrom} to {req.dateTo}
                       </td>
                       <td className="py-2.5 px-4 font-bold text-slate-900">{req.duration} Days</td>
-                      <td className="py-2.5 px-4 text-slate-500 max-w-xs truncate">{req.reason || '-'}</td>
+                      <td className="py-2.5 px-4 text-slate-500 max-w-xs truncate">{req.note || '-'}</td>
                       <td className="py-2.5 px-4">
                         <StatusBadge status={req.status} />
                       </td>

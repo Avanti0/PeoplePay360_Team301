@@ -36,15 +36,10 @@ export const EmployeesPage: React.FC = () => {
   // New Employee Modal
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({
-    firstName: '',
-    lastName: '',
+    name: '',
     email: '',
     phone: '',
-    gender: 'female' as const,
-    dateJoined: new Date().toISOString().split('T')[0],
-    departmentId: 1,
-    jobPositionId: 1,
-    workingScheduleId: 1,
+    department: 'Engineering',
     employmentStatus: 'active' as const,
     bankAccountNumber: '',
     bankName: '',
@@ -72,14 +67,12 @@ export const EmployeesPage: React.FC = () => {
   };
 
   const filteredEmployees = employees.filter((emp) => {
-    const fullName = `${emp.firstName} ${emp.lastName}`.toLowerCase();
     const matchesSearch =
-      fullName.includes(searchQuery.toLowerCase()) ||
-      emp.employeeCode.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      emp.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       emp.email.toLowerCase().includes(searchQuery.toLowerCase());
 
     const matchesDept =
-      selectedDept === 'all' || String(emp.departmentId) === String(selectedDept);
+      selectedDept === 'all' || emp.department === selectedDept;
     const matchesStatus =
       selectedStatus === 'all' || emp.employmentStatus === selectedStatus;
 
@@ -89,13 +82,8 @@ export const EmployeesPage: React.FC = () => {
   const handleCreateEmployee = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const deptObj = departments.find((d) => String(d.id) === String(formData.departmentId));
-      const created = await api.employees.create({
-        ...formData,
-        departmentName: deptObj?.name,
-        name: `${formData.firstName} ${formData.lastName}`,
-      });
-      success(`Employee ${created.employeeCode} (${created.firstName}) created successfully!`);
+      const created = await api.employees.create(formData);
+      success(`Employee ${created.name} created successfully!`);
       setIsModalOpen(false);
       loadData();
     } catch {
@@ -176,7 +164,7 @@ export const EmployeesPage: React.FC = () => {
           >
             <option value="all">All Departments</option>
             {departments.map((d) => (
-              <option key={d.id} value={d.id}>
+              <option key={d.id} value={d.name}>
                 {d.name}
               </option>
             ))}
@@ -208,15 +196,14 @@ export const EmployeesPage: React.FC = () => {
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
                     <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-500 text-white font-black text-sm flex items-center justify-center shadow-md">
-                      {emp.firstName.charAt(0)}
-                      {emp.lastName.charAt(0)}
+                      {emp.name.charAt(0)}
                     </div>
                     <div>
                       <h4 className="text-sm font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
-                        {emp.firstName} {emp.lastName}
+                        {emp.name}
                       </h4>
                       <span className="text-[11px] font-semibold text-slate-400">
-                        {emp.employeeCode}
+                        {emp.jobPosition}
                       </span>
                     </div>
                   </div>
@@ -226,11 +213,11 @@ export const EmployeesPage: React.FC = () => {
                 <div className="mt-4 space-y-2 text-xs text-slate-600 border-t border-slate-100 pt-3">
                   <div className="flex items-center gap-2">
                     <Briefcase className="w-3.5 h-3.5 text-slate-400" />
-                    <span className="font-medium text-slate-800">{emp.jobTitle || 'Team Member'}</span>
+                    <span className="font-medium text-slate-800">{emp.jobPosition || 'Team Member'}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Building2 className="w-3.5 h-3.5 text-slate-400" />
-                    <span>{emp.departmentName || 'General Operations'}</span>
+                    <span>{emp.department || 'General Operations'}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Mail className="w-3.5 h-3.5 text-slate-400" />
@@ -248,7 +235,7 @@ export const EmployeesPage: React.FC = () => {
               </div>
 
               <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-                <span>Joined {new Date(emp.dateJoined).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}</span>
+                <span>{emp.workingScheduleName || 'Standard schedule'}</span>
                 <span className="text-blue-600 font-bold flex items-center gap-1 group-hover:translate-x-1 transition-transform">
                   View Profile &rarr;
                 </span>
@@ -284,18 +271,18 @@ export const EmployeesPage: React.FC = () => {
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-2.5">
                         <div className="w-8 h-8 rounded-xl bg-blue-100 text-blue-700 font-bold flex items-center justify-center text-xs">
-                          {emp.firstName.charAt(0)}
+                          {emp.name.charAt(0)}
                         </div>
                         <div>
                           <p className="font-bold text-slate-900">
-                            {emp.firstName} {emp.lastName}
+                            {emp.name}
                           </p>
-                          <p className="text-[10px] text-slate-400">{emp.employeeCode}</p>
+                          <p className="text-[10px] text-slate-400">{emp.email}</p>
                         </div>
                       </div>
                     </td>
-                    <td className="py-3 px-4 font-semibold text-slate-800">{emp.jobTitle}</td>
-                    <td className="py-3 px-4">{emp.departmentName}</td>
+                    <td className="py-3 px-4 font-semibold text-slate-800">{emp.jobPosition}</td>
+                    <td className="py-3 px-4">{emp.department}</td>
                     <td className="py-3 px-4 text-slate-500">{emp.email}</td>
                     <td className="py-3 px-4 text-slate-600">{emp.workingScheduleName || 'Standard'}</td>
                     <td className="py-3 px-4">
@@ -322,22 +309,12 @@ export const EmployeesPage: React.FC = () => {
       >
         <form onSubmit={handleCreateEmployee} className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">First Name</label>
+            <div className="sm:col-span-2">
+              <label className="block text-xs font-bold text-slate-700 mb-1">Full Name</label>
               <input
                 type="text"
-                value={formData.firstName}
-                onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Last Name</label>
-              <input
-                type="text"
-                value={formData.lastName}
-                onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
                 required
               />
@@ -365,26 +342,16 @@ export const EmployeesPage: React.FC = () => {
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">Department</label>
               <select
-                value={formData.departmentId}
-                onChange={(e) => setFormData({ ...formData, departmentId: Number(e.target.value) })}
+                value={formData.department}
+                onChange={(e) => setFormData({ ...formData, department: e.target.value })}
                 className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
               >
                 {departments.map((d) => (
-                  <option key={d.id} value={d.id}>
+                  <option key={d.id} value={d.name}>
                     {d.name}
                   </option>
                 ))}
               </select>
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Joining Date</label>
-              <input
-                type="date"
-                value={formData.dateJoined}
-                onChange={(e) => setFormData({ ...formData, dateJoined: e.target.value })}
-                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
-                required
-              />
             </div>
           </div>
 

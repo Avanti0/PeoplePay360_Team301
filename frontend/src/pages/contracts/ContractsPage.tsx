@@ -32,13 +32,12 @@ export const ContractsPage: React.FC = () => {
 
   // Form State
   const [formData, setFormData] = useState({
-    employeeId: 2,
+    employeeId: '2',
     dateStart: '2026-09-01',
     dateEnd: '',
-    wage: 1200000,
-    salaryStructureId: 1,
-    workingScheduleId: 1,
-    employmentType: 'permanent' as const,
+    wage: 100000,
+    salaryStructureId: '1',
+    workingScheduleId: '1',
     status: 'draft' as const,
   });
 
@@ -67,9 +66,7 @@ export const ContractsPage: React.FC = () => {
   };
 
   const filteredContracts = contracts.filter((c) => {
-    const matchesSearch =
-      (c.employeeName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (c.employeeCode || '').toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = (c.employeeName || '').toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = selectedStatus === 'all' || c.status === selectedStatus;
     return matchesSearch && matchesStatus;
   });
@@ -91,12 +88,11 @@ export const ContractsPage: React.FC = () => {
     try {
       const newContract = await api.contracts.create({
         ...formData,
-        employeeName: emp?.name || `${emp?.firstName} ${emp?.lastName}`,
-        employeeCode: emp?.employeeCode,
+        employeeName: emp?.name,
         salaryStructureName: struct?.name,
         workingScheduleName: sched?.name,
-        departmentName: emp?.departmentName,
-        jobPositionTitle: emp?.jobTitle,
+        department: emp?.department,
+        jobPosition: emp?.jobPosition,
         dateEnd: formData.dateEnd || null,
       });
 
@@ -181,12 +177,12 @@ export const ContractsPage: React.FC = () => {
                   <td className="py-3 px-4">
                     <Link to={`/contracts/${c.id}`} className="group block">
                       <p className="font-bold text-slate-900 group-hover:text-blue-600 transition-colors">{c.employeeName}</p>
-                      <p className="text-[10px] text-slate-400 font-mono">{c.employeeCode} &bull; #{c.id}</p>
+                      <p className="text-[10px] text-slate-400 font-mono">#{c.id}</p>
                     </Link>
                   </td>
                   <td className="py-3 px-4">
-                    <p className="font-semibold text-slate-800">{c.jobPositionTitle || 'Software Engineer'}</p>
-                    <p className="text-[10px] text-slate-400">{c.departmentName || 'Engineering'}</p>
+                    <p className="font-semibold text-slate-800">{c.jobPosition || 'Software Engineer'}</p>
+                    <p className="text-[10px] text-slate-400">{c.department || 'Engineering'}</p>
                   </td>
                   <td className="py-3 px-4">
                     <div className="flex items-center gap-1.5 text-slate-700">
@@ -239,12 +235,12 @@ export const ContractsPage: React.FC = () => {
             <label className="block text-xs font-bold text-slate-700 mb-1">Employee</label>
             <select
               value={formData.employeeId}
-              onChange={(e) => setFormData({ ...formData, employeeId: Number(e.target.value) })}
+              onChange={(e) => setFormData({ ...formData, employeeId: e.target.value })}
               className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
             >
               {employees.map((emp) => (
                 <option key={emp.id} value={emp.id}>
-                  {emp.firstName} {emp.lastName} ({emp.employeeCode})
+                  {emp.name}
                 </option>
               ))}
             </select>
@@ -297,7 +293,7 @@ export const ContractsPage: React.FC = () => {
               <select
                 value={formData.salaryStructureId}
                 onChange={(e) =>
-                  setFormData({ ...formData, salaryStructureId: Number(e.target.value) })
+                  setFormData({ ...formData, salaryStructureId: e.target.value })
                 }
                 className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
               >

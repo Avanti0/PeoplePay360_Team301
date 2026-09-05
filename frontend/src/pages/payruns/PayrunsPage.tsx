@@ -31,7 +31,7 @@ export const PayrunsPage: React.FC = () => {
   const [isWizardOpen, setIsWizardOpen] = useState(false);
   const [wizardStep, setWizardStep] = useState<1 | 2>(1);
   const [payrunName, setPayrunName] = useState('October 2026 Monthly Payrun');
-  const [selectedStructureId, setSelectedStructureId] = useState<number>(1);
+  const [selectedStructureId, setSelectedStructureId] = useState<string>('1');
   const [periodStart, setPeriodStart] = useState('2026-10-01');
   const [periodEnd, setPeriodEnd] = useState('2026-10-31');
   const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<number[]>([]);
@@ -264,12 +264,12 @@ export const PayrunsPage: React.FC = () => {
                 <label className="block text-xs font-bold text-slate-700 mb-1">Salary Structure</label>
                 <select
                   value={selectedStructureId}
-                  onChange={(e) => setSelectedStructureId(Number(e.target.value))}
+                  onChange={(e) => setSelectedStructureId(e.target.value)}
                   className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
                 >
                   {structures.map((s) => (
                     <option key={s.id} value={s.id}>
-                      {s.name} ({s.code || 'REG_SALARY'})
+                      {s.name}
                     </option>
                   ))}
                 </select>
@@ -355,10 +355,10 @@ export const PayrunsPage: React.FC = () => {
                         />
                         <div>
                           <p className="font-bold text-slate-900">
-                            {emp.firstName} {emp.lastName}
+                            {emp.name}
                           </p>
                           <p className="text-[10px] text-slate-400">
-                            {emp.employeeCode} &bull; {emp.departmentName}
+                            {emp.department}
                           </p>
                         </div>
                       </div>
