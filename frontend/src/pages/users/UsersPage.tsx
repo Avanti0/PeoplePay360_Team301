@@ -3,6 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { api } from '../../services/api';
 import { User, RoleName, Employee } from '../../types';
+import { validateRequired, validateMinLength } from '../../utils/validation';
 import {
   ShieldCheck,
   UserPlus,
@@ -62,6 +63,7 @@ export const UsersPage: React.FC = () => {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   // Search & Filter state
   const [searchTerm, setSearchTerm] = useState<string>('');
@@ -174,6 +176,7 @@ export const UsersPage: React.FC = () => {
       employeeId: '',
       isActive: true,
     });
+    setFormErrors({});
     setShowPassword(false);
     setIsCreateModalOpen(true);
   };
@@ -186,6 +189,7 @@ export const UsersPage: React.FC = () => {
       isActive: userToEdit.isActive,
       password: '',
     });
+    setFormErrors({});
     setShowPassword(false);
     setIsEditModalOpen(true);
   };
@@ -195,16 +199,41 @@ export const UsersPage: React.FC = () => {
     setIsDeleteModalOpen(true);
   };
 
+  const validateCreateForm = (): boolean => {
+    const errors: Record<string, string> = {};
+
+    const userReq = validateRequired(createForm.username, 'Username');
+    if (userReq) errors.username = userReq;
+    else {
+      const userLen = validateMinLength(createForm.username.trim(), 3, 'Username');
+      if (userLen) errors.username = userLen;
+    }
+
+    const passReq = validateRequired(createForm.password, 'Password');
+    if (passReq) errors.password = passReq;
+    else {
+      const passLen = validateMinLength(createForm.password, 6, 'Password');
+      if (passLen) errors.password = passLen;
+    }
+
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const validateEditForm = (): boolean => {
+    const errors: Record<string, string> = {};
+
+    if (editForm.password && editForm.password.length < 6) {
+      errors.password = 'Password must be at least 6 characters';
+    }
+
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!createForm.username.trim()) {
-      error('Username is required');
-      return;
-    }
-    if (!createForm.password || createForm.password.length < 6) {
-      error('Password must be at least 6 characters');
-      return;
-    }
+    if (!validateCreateForm()) return;
 
     setIsSubmitting(true);
     try {
@@ -217,6 +246,7 @@ export const UsersPage: React.FC = () => {
       });
       success(`User account '${createForm.username}' created successfully!`);
       setIsCreateModalOpen(false);
+      setFormErrors({});
       await fetchUsersAndEmployees();
     } catch (err: any) {
       error(err.message || 'Failed to create user account');
@@ -228,6 +258,7 @@ export const UsersPage: React.FC = () => {
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedUser) return;
+    if (!validateEditForm()) return;
 
     setIsSubmitting(true);
     try {
@@ -239,6 +270,7 @@ export const UsersPage: React.FC = () => {
       });
       success(`User account '${selectedUser.username}' updated successfully!`);
       setIsEditModalOpen(false);
+      setFormErrors({});
       await fetchUsersAndEmployees();
     } catch (err: any) {
       error(err.message || 'Failed to update user account');
@@ -604,10 +636,18 @@ export const UsersPage: React.FC = () => {
                   type="text"
                   placeholder="e.g. jdoe or emp-009"
                   value={createForm.username}
-                  onChange={(e) => setCreateForm({ ...createForm, username: e.target.value })}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 text-xs font-medium text-slate-900 outline-none"
+                  onChange={(e) => {
+                    setCreateForm({ ...createForm, username: e.target.value });
+                    if (formErrors.username) setFormErrors({ ...formErrors, username: '' });
+                  }}
+                  className={`w-full px-3.5 py-2.5 rounded-xl border ${
+                    formErrors.username ? 'border-rose-400 bg-rose-50/20' : 'border-slate-300'
+                  } focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 text-xs font-medium text-slate-900 outline-none`}
                   required
                 />
+                {formErrors.username && (
+                  <p className="text-[11px] text-rose-500 mt-1 font-medium">{formErrors.username}</p>
+                )}
               </div>
 
               {/* Password */}
@@ -620,8 +660,13 @@ export const UsersPage: React.FC = () => {
                     type={showPassword ? 'text' : 'password'}
                     placeholder="Min 6 characters"
                     value={createForm.password}
-                    onChange={(e) => setCreateForm({ ...createForm, password: e.target.value })}
-                    className="w-full pl-3.5 pr-10 py-2.5 rounded-xl border border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 text-xs font-medium text-slate-900 outline-none"
+                    onChange={(e) => {
+                      setCreateForm({ ...createForm, password: e.target.value });
+                      if (formErrors.password) setFormErrors({ ...formErrors, password: '' });
+                    }}
+                    className={`w-full pl-3.5 pr-10 py-2.5 rounded-xl border ${
+                      formErrors.password ? 'border-rose-400 bg-rose-50/20' : 'border-slate-300'
+                    } focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 text-xs font-medium text-slate-900 outline-none`}
                     required
                   />
                   <button
@@ -632,6 +677,9 @@ export const UsersPage: React.FC = () => {
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
+                {formErrors.password && (
+                  <p className="text-[11px] text-rose-500 mt-1 font-medium">{formErrors.password}</p>
+                )}
               </div>
 
               {/* Role */}
@@ -776,10 +824,15 @@ export const UsersPage: React.FC = () => {
                 <div className="relative">
                   <input
                     type={showPassword ? 'text' : 'password'}
-                    placeholder="New password (optional)"
+                    placeholder="New password (optional, min 6 chars)"
                     value={editForm.password}
-                    onChange={(e) => setEditForm({ ...editForm, password: e.target.value })}
-                    className="w-full pl-3.5 pr-10 py-2.5 rounded-xl border border-slate-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 text-xs font-medium text-slate-900 outline-none"
+                    onChange={(e) => {
+                      setEditForm({ ...editForm, password: e.target.value });
+                      if (formErrors.password) setFormErrors({ ...formErrors, password: '' });
+                    }}
+                    className={`w-full pl-3.5 pr-10 py-2.5 rounded-xl border ${
+                      formErrors.password ? 'border-rose-400 bg-rose-50/20' : 'border-slate-300'
+                    } focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 text-xs font-medium text-slate-900 outline-none`}
                   />
                   <button
                     type="button"
@@ -789,6 +842,9 @@ export const UsersPage: React.FC = () => {
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
                 </div>
+                {formErrors.password && (
+                  <p className="text-[11px] text-rose-500 mt-1 font-medium">{formErrors.password}</p>
+                )}
               </div>
 
               {/* Active Toggle */}

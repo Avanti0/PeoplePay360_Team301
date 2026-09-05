@@ -27,7 +27,10 @@ export const AttendancePage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
 
   // Manual Correction Modal
+  // Manual Correction Modal
   const [selectedRecord, setSelectedRecord] = useState<AttendanceRecord | null>(null);
+  const [isSubmittingCorrection, setIsSubmittingCorrection] = useState(false);
+  const [correctionErrors, setCorrectionErrors] = useState<Record<string, string>>({});
   const [correctionCheckIn, setCorrectionCheckIn] = useState('');
   const [correctionCheckOut, setCorrectionCheckOut] = useState('');
   const [correctionStatus, setCorrectionStatus] = useState<AttendanceStatus>('present');
@@ -35,7 +38,8 @@ export const AttendancePage: React.FC = () => {
 
   // Quick Punch Modal / State
   const [isPunchModalOpen, setIsPunchModalOpen] = useState(false);
-  const [punchEmployeeId, setPunchEmployeeId] = useState<string>('2');
+  const [isSubmittingPunch, setIsSubmittingPunch] = useState(false);
+  const [punchEmployeeId, setPunchEmployeeId] = useState<string>('');
 
   useEffect(() => {
     loadAttendance();
@@ -50,6 +54,9 @@ export const AttendancePage: React.FC = () => {
       ]);
       setRecords(attData);
       setEmployees(empData);
+      if (empData.length > 0) {
+        setPunchEmployeeId((prev) => prev || String(empData[0].id));
+      }
     } catch {
       error('Failed to load attendance logs');
     } finally {
@@ -69,11 +76,41 @@ export const AttendancePage: React.FC = () => {
     setCorrectionCheckOut(rec.checkOut ? rec.checkOut.substring(11, 16) : '18:00');
     setCorrectionStatus(rec.status);
     setCorrectionNote(rec.note || '');
+    setCorrectionErrors({});
   };
 
   const handleSaveCorrection = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedRecord) return;
+
+    const errors: Record<string, string> = {};
+
+    if (!correctionCheckIn) {
+      errors.checkIn = 'Check-in time is required';
+    }
+
+    if (correctionCheckIn && correctionCheckOut) {
+      const [inH, inM] = correctionCheckIn.split(':').map(Number);
+      const [outH, outM] = correctionCheckOut.split(':').map(Number);
+      if (outH * 60 + outM < inH * 60 + inM) {
+        errors.checkOut = 'Check-out time cannot be earlier than check-in time';
+      }
+    }
+
+    const cleanNote = correctionNote.trim();
+    if (!cleanNote) {
+      errors.note = 'Reason/justification is required for manual attendance corrections';
+    } else if (cleanNote.length < 3) {
+      errors.note = 'Reason must be at least 3 characters';
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setCorrectionErrors(errors);
+      return;
+    }
+
+    setCorrectionErrors({});
+    setIsSubmittingCorrection(true);
 
     try {
       const date = (selectedRecord.checkIn || new Date().toISOString()).slice(0, 10);
@@ -84,20 +121,28 @@ export const AttendancePage: React.FC = () => {
         checkIn: fullCheckIn,
         checkOut: fullCheckOut,
         status: correctionStatus,
-        note: correctionNote,
+        note: cleanNote,
       });
 
       success(`Attendance for ${selectedRecord.employeeName} adjusted.`);
       setSelectedRecord(null);
       loadAttendance();
-    } catch {
-      error('Failed to save manual adjustment');
+    } catch (err: any) {
+      error(err.message || 'Failed to save manual adjustment');
+    } finally {
+      setIsSubmittingCorrection(false);
     }
   };
 
   const handleRecordNewPunch = async (e: React.FormEvent) => {
     e.preventDefault();
-    const emp = employees.find((em) => em.id === punchEmployeeId);
+    if (!punchEmployeeId) {
+      error('Please select an employee');
+      return;
+    }
+
+    setIsSubmittingPunch(true);
+    const emp = employees.find((em) => String(em.id) === String(punchEmployeeId));
     try {
       await api.attendance.create({
         employeeId: punchEmployeeId,
@@ -106,11 +151,13 @@ export const AttendancePage: React.FC = () => {
         checkIn: new Date().toISOString(),
         status: 'present',
       });
-      success(`Check-in logged for ${emp?.name}`);
+      success(`Check-in logged for ${emp?.name || 'employee'}`);
       setIsPunchModalOpen(false);
       loadAttendance();
-    } catch {
-      error('Error logging attendance punch');
+    } catch (err: any) {
+      error(err.message || 'Error logging attendance punch');
+    } finally {
+      setIsSubmittingPunch(false);
     }
   };
 
@@ -285,24 +332,41 @@ export const AttendancePage: React.FC = () => {
         <form onSubmit={handleSaveCorrection} className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Check In Time</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Check In Time <span className="text-rose-500">*</span>
+              </label>
               <input
                 type="time"
                 value={correctionCheckIn}
-                onChange={(e) => setCorrectionCheckIn(e.target.value)}
-                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none font-mono"
+                onChange={(e) => {
+                  setCorrectionCheckIn(e.target.value);
+                  if (correctionErrors.checkIn) setCorrectionErrors({ ...correctionErrors, checkIn: '' });
+                }}
+                className={`w-full px-3 py-2 text-xs rounded-xl border ${
+                  correctionErrors.checkIn ? 'border-rose-300 bg-rose-50/40' : 'border-slate-300'
+                } focus:ring-2 focus:ring-blue-500 outline-none font-mono`}
                 required
               />
+              {correctionErrors.checkIn && (
+                <p className="text-[11px] font-semibold text-rose-600 mt-1">{correctionErrors.checkIn}</p>
+              )}
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">Check Out Time</label>
               <input
                 type="time"
                 value={correctionCheckOut}
-                onChange={(e) => setCorrectionCheckOut(e.target.value)}
-                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none font-mono"
-                required
+                onChange={(e) => {
+                  setCorrectionCheckOut(e.target.value);
+                  if (correctionErrors.checkOut) setCorrectionErrors({ ...correctionErrors, checkOut: '' });
+                }}
+                className={`w-full px-3 py-2 text-xs rounded-xl border ${
+                  correctionErrors.checkOut ? 'border-rose-300 bg-rose-50/40' : 'border-slate-300'
+                } focus:ring-2 focus:ring-blue-500 outline-none font-mono`}
               />
+              {correctionErrors.checkOut && (
+                <p className="text-[11px] font-semibold text-rose-600 mt-1">{correctionErrors.checkOut}</p>
+              )}
             </div>
           </div>
 
@@ -321,15 +385,25 @@ export const AttendancePage: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">Reason / Note</label>
+            <label className="block text-xs font-bold text-slate-700 mb-1">
+              Reason / Justification Note <span className="text-rose-500">*</span>
+            </label>
             <textarea
               rows={2}
               value={correctionNote}
-              onChange={(e) => setCorrectionNote(e.target.value)}
+              onChange={(e) => {
+                setCorrectionNote(e.target.value);
+                if (correctionErrors.note) setCorrectionErrors({ ...correctionErrors, note: '' });
+              }}
               placeholder="e.g. Swapped card after reader maintenance"
-              className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
+              className={`w-full px-3 py-2 text-xs rounded-xl border ${
+                correctionErrors.note ? 'border-rose-300 bg-rose-50/40' : 'border-slate-300'
+              } focus:ring-2 focus:ring-blue-500 outline-none`}
               required
             />
+            {correctionErrors.note && (
+              <p className="text-[11px] font-semibold text-rose-600 mt-1">{correctionErrors.note}</p>
+            )}
           </div>
 
           <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
@@ -342,9 +416,10 @@ export const AttendancePage: React.FC = () => {
             </button>
             <button
               type="submit"
-              className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold"
+              disabled={isSubmittingCorrection}
+              className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold disabled:opacity-50"
             >
-              Save Correction
+              {isSubmittingCorrection ? 'Saving...' : 'Save Correction'}
             </button>
           </div>
         </form>
@@ -389,9 +464,10 @@ export const AttendancePage: React.FC = () => {
             </button>
             <button
               type="submit"
-              className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold"
+              disabled={isSubmittingPunch}
+              className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold disabled:opacity-50"
             >
-              Record Punch Now
+              {isSubmittingPunch ? 'Recording...' : 'Record Punch Now'}
             </button>
           </div>
         </form>

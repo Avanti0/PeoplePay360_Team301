@@ -93,12 +93,55 @@ export const WorkingSchedulesPage: React.FC = () => {
     );
   };
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
+    const errors: Record<string, string> = {};
+
+    const cleanName = name.trim();
+    if (!cleanName) {
+      errors.name = 'Schedule name is required';
+    } else if (cleanName.length < 2) {
+      errors.name = 'Schedule name must be at least 2 characters';
+    }
+
+    const workingLines = lines.filter((l) => l.isWorkingDay);
+    if (workingLines.length === 0) {
+      errors.lines = 'Please select at least 1 working day for the schedule';
+    } else {
+      for (const line of workingLines) {
+        const dayName = DAYS[line.dayOfWeek];
+        if (!line.startTime || !line.endTime) {
+          errors[`day_${line.dayOfWeek}`] = `${dayName}: Start time and End time are required`;
+          break;
+        }
+        const [startH, startM] = line.startTime.split(':').map(Number);
+        const [endH, endM] = line.endTime.split(':').map(Number);
+        const totalMinutes = endH * 60 + endM - (startH * 60 + startM);
+        if (totalMinutes <= 0) {
+          errors[`day_${line.dayOfWeek}`] = `${dayName}: End time must be after Start time`;
+          break;
+        }
+        if (line.breakMinutes < 0 || line.breakMinutes >= totalMinutes) {
+          errors[`day_${line.dayOfWeek}`] = `${dayName}: Break must be between 0 and ${totalMinutes - 1} minutes`;
+          break;
+        }
+      }
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      return;
+    }
+
+    setFormErrors({});
+    setIsSubmitting(true);
     const totalWeekly = calculateTotalWeeklyHours(lines);
     try {
       const created = await api.workingSchedules.create({
-        name,
+        name: cleanName,
         isActive: true,
         weeklyHours: totalWeekly,
         lines,
@@ -108,8 +151,10 @@ export const WorkingSchedulesPage: React.FC = () => {
       setName('');
       loadSchedules();
       setSelectedSchedule(created);
-    } catch {
-      error('Error creating schedule');
+    } catch (err: any) {
+      error(err.message || 'Error creating schedule');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -268,23 +313,45 @@ export const WorkingSchedulesPage: React.FC = () => {
       >
         <form onSubmit={handleCreate} className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Schedule Name</label>
+            <div className="sm:col-span-2">
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Schedule Name <span className="text-rose-500">*</span>
+              </label>
               <input
                 type="text"
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  if (formErrors.name) setFormErrors({ ...formErrors, name: '' });
+                }}
                 placeholder="e.g. Standard Shift A (Mon-Fri)"
-                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
+                className={`w-full px-3 py-2 text-xs rounded-xl border ${
+                  formErrors.name ? 'border-rose-300 bg-rose-50/40' : 'border-slate-300'
+                } focus:ring-2 focus:ring-blue-500 outline-none`}
                 required
               />
+              {formErrors.name && (
+                <p className="text-[11px] font-semibold text-rose-600 mt-1">{formErrors.name}</p>
+              )}
             </div>
           </div>
 
           <div className="pt-2 border-t border-slate-100">
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
-              Weekly Days & Hours Pattern
-            </label>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">
+                Weekly Days & Hours Pattern
+              </label>
+              {formErrors.lines && (
+                <p className="text-[11px] font-semibold text-rose-600">{formErrors.lines}</p>
+              )}
+            </div>
+            {Object.keys(formErrors)
+              .filter((k) => k.startsWith('day_'))
+              .map((k) => (
+                <p key={k} className="text-[11px] font-semibold text-rose-600 mb-2">
+                  {formErrors[k]}
+                </p>
+              ))}
             <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
               {DAYS.map((dayName, idx) => {
                 const line = lines[idx];
@@ -321,6 +388,7 @@ export const WorkingSchedulesPage: React.FC = () => {
                         <span className="text-slate-400 ml-2">Break:</span>
                         <input
                           type="number"
+                          min="0"
                           value={line.breakMinutes}
                           onChange={(e) =>
                             handleLineChange(idx, 'breakMinutes', Number(e.target.value))
@@ -360,9 +428,10 @@ export const WorkingSchedulesPage: React.FC = () => {
               </button>
               <button
                 type="submit"
-                className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold"
+                disabled={isSubmitting}
+                className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold disabled:opacity-50"
               >
-                Save Schedule
+                {isSubmitting ? 'Saving...' : 'Save Schedule'}
               </button>
             </div>
           </div>

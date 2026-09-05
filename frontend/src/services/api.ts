@@ -168,7 +168,17 @@ async function request<T>(
       const rawText = await response.text();
       try {
         const body = JSON.parse(rawText);
-        detail = body?.detail || detail;
+        if (body?.detail) {
+          if (Array.isArray(body.detail)) {
+            detail = body.detail
+              .map((err: any) => err.msg || (typeof err === 'string' ? err : JSON.stringify(err)))
+              .join(', ');
+          } else if (typeof body.detail === 'object') {
+            detail = JSON.stringify(body.detail);
+          } else {
+            detail = String(body.detail);
+          }
+        }
       } catch {
         // Non-JSON response
       }

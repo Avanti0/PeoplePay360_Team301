@@ -49,19 +49,23 @@ export const TimeOffPage: React.FC<TimeOffPageProps> = ({ defaultTab }) => {
   const [employees, setEmployees] = useState<Employee[]>([]);
 
   const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
-  const [reqEmployeeId, setReqEmployeeId] = useState<string>('2');
-  const [reqTypeId, setReqTypeId] = useState<string>('1');
-  const [reqStart, setReqStart] = useState('2026-09-10');
-  const [reqEnd, setReqEnd] = useState('2026-09-11');
-  const [reqDuration, setReqDuration] = useState(2);
+  const [isSubmittingReq, setIsSubmittingReq] = useState(false);
+  const [reqErrors, setReqErrors] = useState<Record<string, string>>({});
+  const [reqEmployeeId, setReqEmployeeId] = useState<string>('');
+  const [reqTypeId, setReqTypeId] = useState<string>('');
+  const [reqStart, setReqStart] = useState(new Date().toISOString().slice(0, 10));
+  const [reqEnd, setReqEnd] = useState(new Date().toISOString().slice(0, 10));
+  const [reqDuration, setReqDuration] = useState(1);
   const [reqReason, setReqReason] = useState('');
 
   const [isAllocModalOpen, setIsAllocModalOpen] = useState(false);
-  const [allocEmployeeId, setAllocEmployeeId] = useState<string>('2');
-  const [allocTypeId, setAllocTypeId] = useState<string>('1');
+  const [isSubmittingAlloc, setIsSubmittingAlloc] = useState(false);
+  const [allocErrors, setAllocErrors] = useState<Record<string, string>>({});
+  const [allocEmployeeId, setAllocEmployeeId] = useState<string>('');
+  const [allocTypeId, setAllocTypeId] = useState<string>('');
   const [allocDays, setAllocDays] = useState(20);
-  const [allocFrom, setAllocFrom] = useState('2026-01-01');
-  const [allocTo, setAllocTo] = useState('2026-12-31');
+  const [allocFrom, setAllocFrom] = useState(new Date().toISOString().slice(0, 4) + '-01-01');
+  const [allocTo, setAllocTo] = useState(new Date().toISOString().slice(0, 4) + '-12-31');
 
   useEffect(() => {
     loadData();
@@ -79,6 +83,15 @@ export const TimeOffPage: React.FC<TimeOffPageProps> = ({ defaultTab }) => {
       setAllocations(allocs);
       setLeaveTypes(types);
       setEmployees(emps);
+
+      if (emps.length > 0) {
+        setReqEmployeeId((prev) => prev || String(emps[0].id));
+        setAllocEmployeeId((prev) => prev || String(emps[0].id));
+      }
+      if (types.length > 0) {
+        setReqTypeId((prev) => prev || String(types[0].id));
+        setAllocTypeId((prev) => prev || String(types[0].id));
+      }
     } catch {
       error('Failed loading time off records');
     }
@@ -89,8 +102,8 @@ export const TimeOffPage: React.FC<TimeOffPageProps> = ({ defaultTab }) => {
       await api.timeOffRequests.approve(reqId);
       success('Leave request approved. Allocation balance deducted automatically (FR-06).');
       loadData();
-    } catch {
-      error('Failed to approve request');
+    } catch (err: any) {
+      error(err.message || 'Failed to approve request');
     }
   };
 
@@ -99,23 +112,65 @@ export const TimeOffPage: React.FC<TimeOffPageProps> = ({ defaultTab }) => {
       await api.timeOffRequests.refuse(reqId);
       warning('Leave request refused.');
       loadData();
-    } catch {
-      error('Failed to refuse request');
+    } catch (err: any) {
+      error(err.message || 'Failed to refuse request');
+    }
+  };
+
+  const handleDateChange = (start: string, end: string) => {
+    setReqStart(start);
+    setReqEnd(end);
+    if (start && end && new Date(end) >= new Date(start)) {
+      const diffMs = new Date(end).getTime() - new Date(start).getTime();
+      const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24)) + 1;
+      setReqDuration(Math.max(1, diffDays));
     }
   };
 
   const handleCreateRequest = async (e: React.FormEvent) => {
     e.preventDefault();
-    const emp = employees.find((em) => em.id === reqEmployeeId);
-    const lType = leaveTypes.find((t) => t.id === reqTypeId);
+    const errors: Record<string, string> = {};
+
+    if (!reqEmployeeId) {
+      errors.employeeId = 'Please select an employee';
+    }
+    if (!reqTypeId) {
+      errors.typeId = 'Please select a leave type';
+    }
+    if (!reqStart) {
+      errors.dateFrom = 'Start date is required';
+    }
+    if (!reqEnd) {
+      errors.dateTo = 'End date is required';
+    }
+    if (reqStart && reqEnd && new Date(reqEnd) < new Date(reqStart)) {
+      errors.dateTo = 'End date cannot be earlier than start date';
+    }
+    if (isNaN(Number(reqDuration)) || Number(reqDuration) <= 0) {
+      errors.duration = 'Duration must be greater than 0 days';
+    }
+
+    const emp = employees.find((em) => String(em.id) === String(reqEmployeeId));
+    const lType = leaveTypes.find((t) => String(t.id) === String(reqTypeId));
     const alloc = allocations.find(
-      (a) => a.employeeId === reqEmployeeId && a.timeOffTypeId === reqTypeId && a.status === 'approved'
+      (a) => String(a.employeeId) === String(reqEmployeeId) && String(a.timeOffTypeId) === String(reqTypeId) && a.status === 'approved'
     );
 
-    if (alloc && alloc.remaining < reqDuration) {
-      warning(`Insufficient leave balance! Available: ${alloc.remaining} days, Requested: ${reqDuration} days.`);
+    if (lType?.requiresAllocation) {
+      if (!alloc) {
+        errors.duration = `No approved allocation found for ${emp?.name || 'this employee'} under ${lType.name}.`;
+      } else if (Number(alloc.remaining) < Number(reqDuration)) {
+        errors.duration = `Insufficient leave balance! Available: ${alloc.remaining} days, Requested: ${reqDuration} days.`;
+      }
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setReqErrors(errors);
       return;
     }
+
+    setReqErrors({});
+    setIsSubmittingReq(true);
 
     try {
       await api.timeOffRequests.create({
@@ -126,22 +181,50 @@ export const TimeOffPage: React.FC<TimeOffPageProps> = ({ defaultTab }) => {
         allocationId: alloc?.id || null,
         dateFrom: reqStart,
         dateTo: reqEnd,
-        duration: reqDuration,
-        note: reqReason || null,
+        duration: Number(reqDuration),
+        note: reqReason.trim() || null,
       });
       success('Time off request submitted.');
       setIsRequestModalOpen(false);
       setReqReason('');
       loadData();
-    } catch {
-      error('Failed submitting leave request');
+    } catch (err: any) {
+      error(err.message || 'Failed submitting leave request');
+    } finally {
+      setIsSubmittingReq(false);
     }
   };
 
   const handleCreateAllocation = async (e: React.FormEvent) => {
     e.preventDefault();
-    const emp = employees.find((em) => em.id === allocEmployeeId);
-    const lType = leaveTypes.find((t) => t.id === allocTypeId);
+    const errors: Record<string, string> = {};
+
+    if (!allocEmployeeId) {
+      errors.employeeId = 'Please select an employee';
+    }
+    if (!allocTypeId) {
+      errors.typeId = 'Please select a leave type';
+    }
+    if (isNaN(Number(allocDays)) || Number(allocDays) <= 0) {
+      errors.days = 'Allocated days must be greater than 0';
+    }
+    if (!allocFrom) {
+      errors.dateFrom = 'Valid from date is required';
+    }
+    if (allocTo && allocFrom && new Date(allocTo) < new Date(allocFrom)) {
+      errors.dateTo = 'Valid to date cannot be earlier than from date';
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setAllocErrors(errors);
+      return;
+    }
+
+    setAllocErrors({});
+    setIsSubmittingAlloc(true);
+
+    const emp = employees.find((em) => String(em.id) === String(allocEmployeeId));
+    const lType = leaveTypes.find((t) => String(t.id) === String(allocTypeId));
 
     try {
       await api.allocations.create({
@@ -149,16 +232,18 @@ export const TimeOffPage: React.FC<TimeOffPageProps> = ({ defaultTab }) => {
         employeeName: emp?.name,
         timeOffTypeId: allocTypeId,
         timeOffTypeName: lType?.name,
-        numberOfDays: allocDays,
+        numberOfDays: Number(allocDays),
         dateFrom: allocFrom,
-        dateTo: allocTo,
+        dateTo: allocTo || null,
         status: 'approved',
       });
-      success(`Granted ${allocDays} days allocation to ${emp?.name}`);
+      success(`Granted ${allocDays} days allocation to ${emp?.name || 'employee'}`);
       setIsAllocModalOpen(false);
       loadData();
-    } catch {
-      error('Error creating allocation');
+    } catch (err: any) {
+      error(err.message || 'Error creating allocation');
+    } finally {
+      setIsSubmittingAlloc(false);
     }
   };
 
@@ -359,11 +444,18 @@ export const TimeOffPage: React.FC<TimeOffPageProps> = ({ defaultTab }) => {
       >
         <form onSubmit={handleCreateRequest} className="space-y-4">
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">Employee</label>
+            <label className="block text-xs font-bold text-slate-700 mb-1">
+              Employee <span className="text-rose-500">*</span>
+            </label>
             <select
               value={reqEmployeeId}
-              onChange={(e) => setReqEmployeeId(e.target.value)}
-              className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
+              onChange={(e) => {
+                setReqEmployeeId(e.target.value);
+                if (reqErrors.employeeId) setReqErrors({ ...reqErrors, employeeId: '' });
+              }}
+              className={`w-full px-3 py-2 text-xs rounded-xl border ${
+                reqErrors.employeeId ? 'border-rose-300 bg-rose-50/40' : 'border-slate-300'
+              } focus:ring-2 focus:ring-blue-500 outline-none`}
             >
               {employees.map((e) => (
                 <option key={e.id} value={e.id}>
@@ -371,68 +463,110 @@ export const TimeOffPage: React.FC<TimeOffPageProps> = ({ defaultTab }) => {
                 </option>
               ))}
             </select>
+            {reqErrors.employeeId && (
+              <p className="text-[11px] font-semibold text-rose-600 mt-1">{reqErrors.employeeId}</p>
+            )}
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">Leave Type</label>
+            <label className="block text-xs font-bold text-slate-700 mb-1">
+              Leave Type <span className="text-rose-500">*</span>
+            </label>
             <select
               value={reqTypeId}
-              onChange={(e) => setReqTypeId(e.target.value)}
-              className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
+              onChange={(e) => {
+                setReqTypeId(e.target.value);
+                if (reqErrors.typeId) setReqErrors({ ...reqErrors, typeId: '' });
+              }}
+              className={`w-full px-3 py-2 text-xs rounded-xl border ${
+                reqErrors.typeId ? 'border-rose-300 bg-rose-50/40' : 'border-slate-300'
+              } focus:ring-2 focus:ring-blue-500 outline-none`}
             >
               {leaveTypes.map((t) => (
                 <option key={t.id} value={t.id}>
-                  {t.name}
+                  {t.name} ({t.unit})
                 </option>
               ))}
             </select>
+            {reqErrors.typeId && (
+              <p className="text-[11px] font-semibold text-rose-600 mt-1">{reqErrors.typeId}</p>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">From Date</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                From Date <span className="text-rose-500">*</span>
+              </label>
               <input
                 type="date"
                 value={reqStart}
-                onChange={(e) => setReqStart(e.target.value)}
-                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
+                onChange={(e) => {
+                  handleDateChange(e.target.value, reqEnd);
+                  if (reqErrors.dateFrom) setReqErrors({ ...reqErrors, dateFrom: '' });
+                }}
+                className={`w-full px-3 py-2 text-xs rounded-xl border ${
+                  reqErrors.dateFrom ? 'border-rose-300 bg-rose-50/40' : 'border-slate-300'
+                } focus:ring-2 focus:ring-blue-500 outline-none`}
                 required
               />
+              {reqErrors.dateFrom && (
+                <p className="text-[11px] font-semibold text-rose-600 mt-1">{reqErrors.dateFrom}</p>
+              )}
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">To Date</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                To Date <span className="text-rose-500">*</span>
+              </label>
               <input
                 type="date"
                 value={reqEnd}
-                onChange={(e) => setReqEnd(e.target.value)}
-                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
+                onChange={(e) => {
+                  handleDateChange(reqStart, e.target.value);
+                  if (reqErrors.dateTo) setReqErrors({ ...reqErrors, dateTo: '' });
+                }}
+                className={`w-full px-3 py-2 text-xs rounded-xl border ${
+                  reqErrors.dateTo ? 'border-rose-300 bg-rose-50/40' : 'border-slate-300'
+                } focus:ring-2 focus:ring-blue-500 outline-none`}
                 required
               />
+              {reqErrors.dateTo && (
+                <p className="text-[11px] font-semibold text-rose-600 mt-1">{reqErrors.dateTo}</p>
+              )}
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">Duration (Days)</label>
+            <label className="block text-xs font-bold text-slate-700 mb-1">
+              Duration (Days) <span className="text-rose-500">*</span>
+            </label>
             <input
               type="number"
               min="0.5"
               step="0.5"
               value={reqDuration}
-              onChange={(e) => setReqDuration(Number(e.target.value))}
-              className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
+              onChange={(e) => {
+                setReqDuration(Number(e.target.value));
+                if (reqErrors.duration) setReqErrors({ ...reqErrors, duration: '' });
+              }}
+              className={`w-full px-3 py-2 text-xs rounded-xl border ${
+                reqErrors.duration ? 'border-rose-300 bg-rose-50/40' : 'border-slate-300'
+              } focus:ring-2 focus:ring-blue-500 outline-none`}
               required
             />
+            {reqErrors.duration && (
+              <p className="text-[11px] font-semibold text-rose-600 mt-1">{reqErrors.duration}</p>
+            )}
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">Reason</label>
+            <label className="block text-xs font-bold text-slate-700 mb-1">Reason (Optional)</label>
             <textarea
               rows={2}
               value={reqReason}
               onChange={(e) => setReqReason(e.target.value)}
               placeholder="e.g. Attending personal family event"
               className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
-              required
             />
           </div>
 
@@ -446,9 +580,10 @@ export const TimeOffPage: React.FC<TimeOffPageProps> = ({ defaultTab }) => {
             </button>
             <button
               type="submit"
-              className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold"
+              disabled={isSubmittingReq}
+              className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold disabled:opacity-50"
             >
-              Submit Request
+              {isSubmittingReq ? 'Submitting...' : 'Submit Request'}
             </button>
           </div>
         </form>
@@ -463,11 +598,18 @@ export const TimeOffPage: React.FC<TimeOffPageProps> = ({ defaultTab }) => {
       >
         <form onSubmit={handleCreateAllocation} className="space-y-4">
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">Employee</label>
+            <label className="block text-xs font-bold text-slate-700 mb-1">
+              Employee <span className="text-rose-500">*</span>
+            </label>
             <select
               value={allocEmployeeId}
-              onChange={(e) => setAllocEmployeeId(e.target.value)}
-              className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
+              onChange={(e) => {
+                setAllocEmployeeId(e.target.value);
+                if (allocErrors.employeeId) setAllocErrors({ ...allocErrors, employeeId: '' });
+              }}
+              className={`w-full px-3 py-2 text-xs rounded-xl border ${
+                allocErrors.employeeId ? 'border-rose-300 bg-rose-50/40' : 'border-slate-300'
+              } focus:ring-2 focus:ring-blue-500 outline-none`}
             >
               {employees.map((e) => (
                 <option key={e.id} value={e.id}>
@@ -475,14 +617,24 @@ export const TimeOffPage: React.FC<TimeOffPageProps> = ({ defaultTab }) => {
                 </option>
               ))}
             </select>
+            {allocErrors.employeeId && (
+              <p className="text-[11px] font-semibold text-rose-600 mt-1">{allocErrors.employeeId}</p>
+            )}
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">Leave Type</label>
+            <label className="block text-xs font-bold text-slate-700 mb-1">
+              Leave Type <span className="text-rose-500">*</span>
+            </label>
             <select
               value={allocTypeId}
-              onChange={(e) => setAllocTypeId(e.target.value)}
-              className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
+              onChange={(e) => {
+                setAllocTypeId(e.target.value);
+                if (allocErrors.typeId) setAllocErrors({ ...allocErrors, typeId: '' });
+              }}
+              className={`w-full px-3 py-2 text-xs rounded-xl border ${
+                allocErrors.typeId ? 'border-rose-300 bg-rose-50/40' : 'border-slate-300'
+              } focus:ring-2 focus:ring-blue-500 outline-none`}
             >
               {leaveTypes.map((t) => (
                 <option key={t.id} value={t.id}>
@@ -490,40 +642,71 @@ export const TimeOffPage: React.FC<TimeOffPageProps> = ({ defaultTab }) => {
                 </option>
               ))}
             </select>
+            {allocErrors.typeId && (
+              <p className="text-[11px] font-semibold text-rose-600 mt-1">{allocErrors.typeId}</p>
+            )}
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">Number of Days Allocated</label>
+            <label className="block text-xs font-bold text-slate-700 mb-1">
+              Number of Days Allocated <span className="text-rose-500">*</span>
+            </label>
             <input
               type="number"
-              min="1"
+              min="0.5"
+              step="0.5"
               value={allocDays}
-              onChange={(e) => setAllocDays(Number(e.target.value))}
-              className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
+              onChange={(e) => {
+                setAllocDays(Number(e.target.value));
+                if (allocErrors.days) setAllocErrors({ ...allocErrors, days: '' });
+              }}
+              className={`w-full px-3 py-2 text-xs rounded-xl border ${
+                allocErrors.days ? 'border-rose-300 bg-rose-50/40' : 'border-slate-300'
+              } focus:ring-2 focus:ring-blue-500 outline-none`}
               required
             />
+            {allocErrors.days && (
+              <p className="text-[11px] font-semibold text-rose-600 mt-1">{allocErrors.days}</p>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Valid From</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Valid From <span className="text-rose-500">*</span>
+              </label>
               <input
                 type="date"
                 value={allocFrom}
-                onChange={(e) => setAllocFrom(e.target.value)}
-                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
+                onChange={(e) => {
+                  setAllocFrom(e.target.value);
+                  if (allocErrors.dateFrom) setAllocErrors({ ...allocErrors, dateFrom: '' });
+                }}
+                className={`w-full px-3 py-2 text-xs rounded-xl border ${
+                  allocErrors.dateFrom ? 'border-rose-300 bg-rose-50/40' : 'border-slate-300'
+                } focus:ring-2 focus:ring-blue-500 outline-none`}
                 required
               />
+              {allocErrors.dateFrom && (
+                <p className="text-[11px] font-semibold text-rose-600 mt-1">{allocErrors.dateFrom}</p>
+              )}
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">Valid To</label>
               <input
                 type="date"
                 value={allocTo}
-                onChange={(e) => setAllocTo(e.target.value)}
-                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
-                required
+                onChange={(e) => {
+                  setAllocTo(e.target.value);
+                  if (allocErrors.dateTo) setAllocErrors({ ...allocErrors, dateTo: '' });
+                }}
+                className={`w-full px-3 py-2 text-xs rounded-xl border ${
+                  allocErrors.dateTo ? 'border-rose-300 bg-rose-50/40' : 'border-slate-300'
+                } focus:ring-2 focus:ring-blue-500 outline-none`}
               />
+              {allocErrors.dateTo && (
+                <p className="text-[11px] font-semibold text-rose-600 mt-1">{allocErrors.dateTo}</p>
+              )}
             </div>
           </div>
 
@@ -537,9 +720,10 @@ export const TimeOffPage: React.FC<TimeOffPageProps> = ({ defaultTab }) => {
             </button>
             <button
               type="submit"
-              className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold"
+              disabled={isSubmittingAlloc}
+              className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold disabled:opacity-50"
             >
-              Approve & Grant
+              {isSubmittingAlloc ? 'Granting...' : 'Approve & Grant'}
             </button>
           </div>
         </form>
