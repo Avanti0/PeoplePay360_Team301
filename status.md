@@ -114,10 +114,11 @@ Status key: ⬜ Not started | 🔄 In progress | ✅ Done | 🔀 Merged to main
 | Date       | Branch             | Merged by            | What was merged |
 |------------|--------------------|----------------------|-----------------|
 | 2026-09-05 | `feature/database` | Maddi Soumya         | Full schema.sql + seed.sql (all tables, constraints, triggers, demo data) |
-| 2026-09-05 | `feature/frontend` | T. Lakshmi Vyshnavi  | Full React app: all pages, routing, RBAC auth, mock fallback, api.ts wired to all endpoints |
+| 2026-09-05 | `feature/frontend` | T. Lakshmi Vyshnavi  | Login UI (Form validation, loading state, invalid credentials banner, API error handling, demo persona quick login, password toggle) |
+| 2026-09-05 | `feature/frontend` | T. Lakshmi Vyshnavi  | Frontend Routes (Complete route suite: `/dashboard`, `/employees`, `/employees/:id`, `/contracts`, `/contracts/:id`, `/working-schedules`, `/attendance`, `/time-off/types`, `/time-off/allocations`, `/time-off/requests`, `/salary-structures`, `/salary-rules`, `/payruns`, `/payruns/:id`, `/payslips`, `/payslips/:id`) |
+| 2026-09-05 | `feature/frontend` | T. Lakshmi Vyshnavi  | App Shell (Sidebar with 5 grouped navigation sections, Topbar with responsive search/notifications/breadcrumbs, UserMenu with profile/role switcher) |
 | 2026-09-05 | `feature/backend`  | Avanti Dharmapurikar | FastAPI scaffold, JWT auth, RBAC, all module APIs, payrun engine, salary rule execution, PDF, email, dashboard |
-| 2026-09-05 | `feature/frontend` | Avanti Dharmapurikar | fix: login form-urlencoded for FastAPI OAuth2 |
-| 2026-09-05 | all branches       | Avanti Dharmapurikar | Merged feature/backend + feature/frontend into main — full integration |
+| 2026-09-05 | all branches       | Team                 | Merged feature/backend + feature/frontend into main — full integration |
 
 ---
 
@@ -125,8 +126,7 @@ Status key: ⬜ Not started | 🔄 In progress | ✅ Done | 🔀 Merged to main
 
 | # | Raised by | Question / Blocker | Status |
 |---|-----------|--------------------|--------|
-| 1 | Avanti | Login in api.ts sends JSON but FastAPI OAuth2 needs form-urlencoded — fix before integration test | Open |
-| 2 | All | docker-compose.yml not created yet — needed before end-to-end testing | Open |
+| 1 | All       | docker-compose.yml not created yet — needed before end-to-end testing | Open |
 
 ---
 
