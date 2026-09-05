@@ -87,16 +87,16 @@ This file lives on `main`. Update it every time you reach a meaningful commit po
 
 | Module                  | Database         | Backend          | Frontend         |
 |-------------------------|------------------|------------------|------------------|
-| Employee Management     | ⬜ Not started   | ⬜ Not started   | ⬜ Not started   |
-| Contract Management     | ⬜ Not started   | ⬜ Not started   | ⬜ Not started   |
-| Working Schedules       | ⬜ Not started   | ⬜ Not started   | ⬜ Not started   |
-| Attendance              | ⬜ Not started   | ⬜ Not started   | ⬜ Not started   |
-| Time Off                | ⬜ Not started   | ⬜ Not started   | ⬜ Not started   |
-| Salary Structures/Rules | ⬜ Not started   | ⬜ Not started   | ⬜ Not started   |
-| Payrun Processing       | ⬜ Not started   | ⬜ Not started   | ⬜ Not started   |
-| Payslip Generation      | ⬜ Not started   | ⬜ Not started   | ⬜ Not started   |
-| Payroll Dashboard       | ⬜ Not started   | ⬜ Not started   | ⬜ Not started   |
-| Auth / RBAC             | ⬜ Not started   | ⬜ Not started   | ⬜ Not started   |
+| Employee Management     | ⬜ Not started   | ⬜ Not started   | ✅ Done          |
+| Contract Management     | ⬜ Not started   | ⬜ Not started   | ✅ Done          |
+| Working Schedules       | ⬜ Not started   | ⬜ Not started   | ✅ Done          |
+| Attendance              | ⬜ Not started   | ⬜ Not started   | ✅ Done          |
+| Time Off                | ⬜ Not started   | ⬜ Not started   | ✅ Done          |
+| Salary Structures/Rules | ⬜ Not started   | ⬜ Not started   | ✅ Done          |
+| Payrun Processing       | ⬜ Not started   | ⬜ Not started   | ✅ Done          |
+| Payslip Generation      | ⬜ Not started   | ⬜ Not started   | ✅ Done          |
+| Payroll Dashboard       | ⬜ Not started   | ⬜ Not started   | ✅ Done          |
+| Auth / RBAC             | ⬜ Not started   | ⬜ Not started   | ✅ Done          |
 
 Status key: ⬜ Not started | 🔄 In progress | ✅ Done | 🔀 Merged to main
 
