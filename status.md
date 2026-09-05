@@ -111,6 +111,7 @@ Status key: ⬜ Not started | 🔄 In progress | ✅ Done | 🔀 Merged to main
 
 | Date | Branch | Merged by | What was merged |
 |------|--------|-----------|-----------------|
+| 2026-09-05 | `feature/frontend` | T. Lakshmi Vyshnavi | Frontend Routes (Complete route suite: `/dashboard`, `/employees`, `/employees/:id`, `/contracts`, `/contracts/:id`, `/working-schedules`, `/attendance`, `/time-off/types`, `/time-off/allocations`, `/time-off/requests`, `/salary-structures`, `/salary-rules`, `/payruns`, `/payruns/:id`, `/payslips`, `/payslips/:id`) |
 | 2026-09-05 | `feature/frontend` | T. Lakshmi Vyshnavi | App Shell (Sidebar with 5 grouped navigation sections, Topbar with responsive search/notifications/breadcrumbs, UserMenu with profile/role switcher) |
 | 2026-09-05 | `feature/database` | Maddi Soumya | Schema/seed rewritten to match this file's Naming Conventions + `docs/modules/*.md` exactly (UUID ids, `employees.name`, `date_start`/`date_end`, `allocations`, `schedule_lines`, etc.) - not yet re-merged into `main`, see note below |
 

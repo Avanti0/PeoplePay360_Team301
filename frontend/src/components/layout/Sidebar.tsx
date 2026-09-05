@@ -69,9 +69,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
       name: 'Time Off',
       icon: CalendarCheck,
       children: [
-        { name: 'Leave Types', to: '/time-off?tab=types', icon: Layers },
-        { name: 'Allocations', to: '/time-off?tab=allocations', icon: PieChart },
-        { name: 'Requests', to: '/time-off?tab=requests', icon: CalendarCheck },
+        { name: 'Leave Types', to: '/time-off/types', icon: Layers },
+        { name: 'Allocations', to: '/time-off/allocations', icon: PieChart },
+        { name: 'Requests', to: '/time-off/requests', icon: CalendarCheck },
       ],
     },
     {
@@ -79,7 +79,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       icon: Calculator,
       children: [
         { name: 'Salary Structures', to: '/salary-structures', icon: Layers },
-        { name: 'Salary Rules', to: '/salary-structures', icon: Sliders },
+        { name: 'Salary Rules', to: '/salary-rules', icon: Sliders },
         { name: 'Payruns', to: '/payruns', icon: Calculator },
         { name: 'Payslips', to: '/payslips', icon: Receipt },
       ],
