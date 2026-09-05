@@ -116,6 +116,8 @@ Status key: ⬜ Not started | 🔄 In progress | ✅ Done | 🔀 Merged to main
 | 2026-09-05 | `feature/database` | Maddi Soumya         | Full schema.sql + seed.sql (all tables, constraints, triggers, demo data) |
 | 2026-09-05 | `feature/frontend` | T. Lakshmi Vyshnavi  | Full React app: all pages, routing, RBAC auth, mock fallback, api.ts wired to all endpoints |
 | 2026-09-05 | `feature/backend`  | Avanti Dharmapurikar | FastAPI scaffold, JWT auth, RBAC, all module APIs, payrun engine, salary rule execution, PDF, email, dashboard |
+| 2026-09-05 | `feature/frontend` | Avanti Dharmapurikar | fix: login form-urlencoded for FastAPI OAuth2 |
+| 2026-09-05 | all branches       | Avanti Dharmapurikar | Merged feature/backend + feature/frontend into main — full integration |
 
 ---
 
