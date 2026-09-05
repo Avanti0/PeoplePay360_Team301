@@ -32,14 +32,19 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
 
   const handleBack = () => {
     if (onBack) {
+      // Caller supplied a custom handler (e.g. close a modal, reset state)
       onBack();
     } else if (backTo) {
+      // Always use an explicit path — never rely on browser history position,
+      // because the user may have arrived via a direct URL, dashboard shortcut,
+      // or any route that would make navigate(-1) land on the wrong page.
       navigate(backTo);
-    } else {
-      navigate(-1);
     }
+    // No fallback to navigate(-1): if neither backTo nor onBack is provided,
+    // showBackButton is false so this handler is never called.
   };
 
+  // Back button is only rendered when an explicit destination is known.
   const showBackButton = !!backTo || !!onBack;
 
   return (

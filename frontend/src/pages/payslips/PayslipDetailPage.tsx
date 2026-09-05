@@ -71,11 +71,11 @@ export const PayslipDetailPage: React.FC = () => {
       {/* Top Bar (Hidden in Print) */}
       <div className="no-print flex items-center justify-between">
         <button
-          onClick={() => navigate(-1)}
+          onClick={() => navigate('/payslips')}
           className="flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-slate-900 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
-          <span>Back</span>
+          <span>Back to Payslips</span>
         </button>
 
         <div className="flex items-center gap-3">

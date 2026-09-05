@@ -226,7 +226,7 @@ function handleMockRoutes(endpoint: string, method: string, body: any): any {
     );
 
     const user: User = matchedUser || {
-      id: 99,
+      id: '99',
       username: body?.username || 'demo.user',
       role: (body?.role || 'employee') as RoleName,
       employeeName: 'Demo User',
