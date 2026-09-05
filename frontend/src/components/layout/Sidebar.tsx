@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
+import { RoleName } from '../../types';
 import {
   LayoutDashboard,
   Users,
@@ -11,11 +13,10 @@ import {
   Receipt,
   Layers,
   ChevronDown,
-  ListTodo,
   PieChart,
   Sliders,
   X,
-  Sparkles,
+  Shield,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -27,12 +28,14 @@ interface NavChild {
   name: string;
   to: string;
   icon?: React.ComponentType<{ className?: string }>;
+  allowedRoles?: RoleName[];
 }
 
 interface NavGroup {
   name: string;
   icon: React.ComponentType<{ className?: string }>;
   to?: string;
+  allowedRoles?: RoleName[];
   children?: NavChild[];
 }
 
@@ -41,52 +44,74 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onCloseMobile,
 }) => {
   const location = useLocation();
+  const { role } = useAuth();
 
-  // Navigation Groups matching Prompt 4
+  // Navigation Groups with RBAC Role Specifications
   const navGroups: NavGroup[] = [
     {
       name: 'Dashboard',
       to: '/dashboard',
       icon: LayoutDashboard,
+      allowedRoles: ['employee', 'hr_manager', 'hr_payroll_user', 'hr_payroll_manager', 'admin'],
     },
     {
       name: 'People',
       icon: Users,
+      allowedRoles: ['hr_manager', 'hr_payroll_user', 'hr_payroll_manager', 'admin'],
       children: [
-        { name: 'Employees', to: '/employees', icon: Users },
-        { name: 'Contracts', to: '/contracts', icon: FileSignature },
-        { name: 'Working Schedules', to: '/working-schedules', icon: CalendarDays },
+        { name: 'Employees', to: '/employees', icon: Users, allowedRoles: ['hr_manager', 'hr_payroll_manager', 'admin'] },
+        { name: 'Contracts', to: '/contracts', icon: FileSignature, allowedRoles: ['hr_payroll_user', 'hr_payroll_manager', 'admin'] },
+        { name: 'Working Schedules', to: '/working-schedules', icon: CalendarDays, allowedRoles: ['hr_manager', 'hr_payroll_manager', 'admin'] },
       ],
     },
     {
       name: 'Attendance',
       icon: Clock,
+      allowedRoles: ['employee', 'hr_manager', 'hr_payroll_user', 'hr_payroll_manager', 'admin'],
       children: [
-        { name: 'Attendance Logs', to: '/attendance', icon: Clock },
+        { name: 'Attendance Logs', to: '/attendance', icon: Clock, allowedRoles: ['employee', 'hr_manager', 'hr_payroll_user', 'hr_payroll_manager', 'admin'] },
       ],
     },
     {
       name: 'Time Off',
       icon: CalendarCheck,
+      allowedRoles: ['employee', 'hr_manager', 'hr_payroll_user', 'hr_payroll_manager', 'admin'],
       children: [
-        { name: 'Leave Types', to: '/time-off/types', icon: Layers },
-        { name: 'Allocations', to: '/time-off/allocations', icon: PieChart },
-        { name: 'Requests', to: '/time-off/requests', icon: CalendarCheck },
+        { name: 'Leave Types', to: '/time-off/types', icon: Layers, allowedRoles: ['hr_manager', 'admin'] },
+        { name: 'Allocations', to: '/time-off/allocations', icon: PieChart, allowedRoles: ['hr_manager', 'hr_payroll_manager', 'admin'] },
+        { name: 'Requests', to: '/time-off/requests', icon: CalendarCheck, allowedRoles: ['employee', 'hr_manager', 'hr_payroll_user', 'hr_payroll_manager', 'admin'] },
       ],
     },
     {
       name: 'Payroll',
       icon: Calculator,
+      allowedRoles: ['employee', 'hr_payroll_user', 'hr_payroll_manager', 'admin'],
       children: [
-        { name: 'Salary Structures', to: '/salary-structures', icon: Layers },
-        { name: 'Salary Rules', to: '/salary-rules', icon: Sliders },
-        { name: 'Payruns', to: '/payruns', icon: Calculator },
-        { name: 'Payslips', to: '/payslips', icon: Receipt },
+        { name: 'Salary Structures', to: '/salary-structures', icon: Layers, allowedRoles: ['hr_payroll_manager', 'admin'] },
+        { name: 'Salary Rules', to: '/salary-rules', icon: Sliders, allowedRoles: ['hr_payroll_manager', 'admin'] },
+        { name: 'Payruns', to: '/payruns', icon: Calculator, allowedRoles: ['hr_payroll_user', 'hr_payroll_manager', 'admin'] },
+        { name: 'Payslips', to: '/payslips', icon: Receipt, allowedRoles: ['employee', 'hr_manager', 'hr_payroll_user', 'hr_payroll_manager', 'admin'] },
       ],
     },
   ];
 
-  // Track expanded groups (all expanded by default for quick access)
+  // Filter navigation items by active user role
+  const isRoleAuthorized = (allowed?: RoleName[]) => {
+    if (!allowed || allowed.length === 0) return true;
+    if (role === 'admin') return true;
+    return allowed.includes(role);
+  };
+
+  const visibleNavGroups = navGroups
+    .filter((g) => isRoleAuthorized(g.allowedRoles))
+    .map((g) => {
+      if (!g.children) return g;
+      const visibleChildren = g.children.filter((c) => isRoleAuthorized(c.allowedRoles));
+      return { ...g, children: visibleChildren };
+    })
+    .filter((g) => (g.to ? true : g.children && g.children.length > 0));
+
+  // Track expanded groups
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({
     People: true,
     Attendance: true,
@@ -161,7 +186,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Navigation Sections */}
         <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1.5">
-          {navGroups.map((group) => {
+          {visibleNavGroups.map((group) => {
             const GroupIcon = group.icon;
             const hasChildren = group.children && group.children.length > 0;
             const isExpanded = expandedGroups[group.name] !== false;
