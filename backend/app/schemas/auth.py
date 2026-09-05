@@ -17,8 +17,10 @@ class TokenOut(BaseModel):
 class UserCreate(BaseModel):
     username: str
     password: str
-    role: UserRole
-    employee_id: Optional[UUID] = None  # existing employee to link this account to
+    role: Optional[UserRole] = UserRole.employee
+    full_name: Optional[str] = None
+    email: Optional[str] = None
+    employee_id: Optional[UUID] = None
 
 class UserOut(BaseModel):
     id: UUID

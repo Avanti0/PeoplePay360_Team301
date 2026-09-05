@@ -26,8 +26,16 @@ def _build_user_me(db: Session, user: User) -> UserMeOut:
 @router.post("/login", response_model=LoginOut)
 def login(response: Response, form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     user = db.query(User).filter(User.username == form.username).first()
+    if not user:
+        # Also support login using linked employee email
+        emp = db.query(Employee).filter(Employee.email == form.username).first()
+        if emp and emp.user_id:
+            user = db.query(User).filter(User.id == emp.user_id).first()
+
     if not user or not verify_password(form.password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+    if not user.is_active:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This account has been deactivated. Please contact an administrator.")
     access_token = create_access_token({"sub": str(user.id), "role": user.role})
     refresh_token = create_refresh_token({"sub": str(user.id), "role": user.role})
     response.set_cookie("refresh_token", refresh_token, httponly=True, max_age=7*24*3600)
@@ -52,28 +60,53 @@ def me(current_user: User = Depends(get_current_user), db: Session = Depends(get
 
 @router.post("/register", response_model=UserOut)
 def register(data: UserCreate, db: Session = Depends(get_db)):
-    if db.query(User).filter(User.username == data.username).first():
-        raise HTTPException(status_code=400, detail="Username already registered")
+    clean_username = data.username.strip()
+    if not clean_username:
+        raise HTTPException(status_code=400, detail="Username is required")
+
+    if db.query(User).filter(User.username == clean_username).first():
+        raise HTTPException(status_code=400, detail="Username is already registered")
 
     employee = None
-    if data.employee_id is not None:
+    if data.email:
+        clean_email = data.email.strip().lower()
+        employee = db.query(Employee).filter(Employee.email == clean_email).first()
+        if employee and employee.user_id is not None:
+            raise HTTPException(status_code=400, detail="An account is already linked to this email address")
+    else:
+        clean_email = None
+
+    if data.employee_id is not None and employee is None:
         employee = db.query(Employee).filter(Employee.id == data.employee_id).first()
         if not employee:
-            raise HTTPException(status_code=400, detail="employee_id does not reference an existing employee")
+            raise HTTPException(status_code=400, detail="Referenced employee not found")
         if employee.user_id is not None:
             raise HTTPException(status_code=400, detail="This employee is already linked to a login account")
 
+    # Security: Self-registration strictly defaults to standard 'employee' role
     user = User(
-        username=data.username,
+        username=clean_username,
         password_hash=hash_password(data.password),
-        role=data.role.value,
+        role="employee",
+        is_active=True,
     )
     db.add(user)
-    db.flush()  # assigns user.id before we link it to the employee below
+    db.flush()
 
     if employee is not None:
         employee.user_id = user.id
+        if data.full_name and not employee.name:
+            employee.name = data.full_name.strip()
+    elif clean_email:
+        new_emp = Employee(
+            user_id=user.id,
+            name=(data.full_name.strip() if data.full_name else clean_username),
+            email=clean_email,
+            employment_status="active",
+        )
+        db.add(new_emp)
 
     db.commit()
     db.refresh(user)
     return UserOut(id=user.id, username=user.username, role=user.role, is_active=user.is_active)
+

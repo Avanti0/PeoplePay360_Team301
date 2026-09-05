@@ -18,6 +18,7 @@ import {
   X,
   Sparkles,
   ShieldCheck,
+  LogOut,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -43,7 +44,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onCloseMobile,
 }) => {
   const location = useLocation();
-  const { hasRole, user } = useAuth();
+  const { hasRole, user, logout } = useAuth();
   const isAdmin = hasRole('admin') || user?.role === 'admin';
 
   const isHrManager =
@@ -273,14 +274,32 @@ export const Sidebar: React.FC<SidebarProps> = ({
           })}
         </nav>
 
-        {/* Footer Brand Info */}
-        <div className="p-3 border-t border-slate-800 bg-slate-950/40">
-          <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-800/50 border border-slate-800">
-            <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <div className="overflow-hidden">
-              <p className="text-[10px] text-slate-400 font-medium truncate">PeoplePay360 Platform</p>
-              <p className="text-[11px] font-bold text-slate-200 truncate">v1.0.0 &bull; Ready</p>
+        {/* Footer User & Brand Info */}
+        <div className="p-3 border-t border-slate-800 bg-slate-950/40 space-y-2">
+          <div className="flex items-center justify-between p-2 rounded-xl bg-slate-800/60 border border-slate-800">
+            <div className="flex items-center gap-2.5 overflow-hidden">
+              <div className="w-7 h-7 rounded-lg bg-blue-600 text-white font-bold text-xs flex items-center justify-center shrink-0">
+                {(user?.employeeName || user?.username || 'U').charAt(0).toUpperCase()}
+              </div>
+              <div className="overflow-hidden">
+                <p className="text-xs font-bold text-white truncate">
+                  {user?.employeeName || user?.username || 'User'}
+                </p>
+                <p className="text-[10px] text-slate-400 capitalize truncate">
+                  {user?.role ? user.role.replace(/_/g, ' ') : 'Employee'}
+                </p>
+              </div>
             </div>
+            <button
+              type="button"
+              onClick={async () => {
+                await logout();
+              }}
+              title="Sign Out"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-700/80 transition-colors cursor-pointer"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+            </button>
           </div>
         </div>
       </aside>

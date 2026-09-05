@@ -1,15 +1,18 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import {
   LogOut,
   Shield,
   ChevronDown,
+  LogIn,
 } from 'lucide-react';
 
 export const UserMenu: React.FC = () => {
   const { user, role, logout } = useAuth();
   const { success } = useToast();
+  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -75,11 +78,15 @@ export const UserMenu: React.FC = () => {
             </div>
           </div>
 
-          {/* Logout */}
-          <div className="pt-1 border-t border-slate-100 mt-1">
+          {/* Sign Out */}
+          <div className="py-1">
             <button
-              onClick={handleLogout}
-              className="w-full px-4 py-2 text-left text-xs text-rose-600 hover:bg-rose-50 flex items-center gap-2.5 transition-colors font-semibold"
+              onClick={async () => {
+                setIsOpen(false);
+                await handleLogout();
+                navigate('/login');
+              }}
+              className="w-full px-4 py-2 text-left text-xs text-rose-600 hover:bg-rose-50 flex items-center gap-2.5 transition-colors font-semibold cursor-pointer"
             >
               <LogOut className="w-4 h-4 text-rose-500" />
               <span>Sign Out</span>

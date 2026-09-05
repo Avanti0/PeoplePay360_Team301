@@ -908,6 +908,18 @@ export const api = {
         method: 'POST',
       }),
     getMe: () => request<User>('/auth/me'),
+    register: (data: {
+      username: string;
+      password: string;
+      fullName?: string;
+      email?: string;
+      role?: RoleName;
+      employeeId?: string;
+    }) =>
+      request<User>('/auth/register', {
+        method: 'POST',
+        body: JSON.stringify(camelToSnake({ role: 'employee', ...data })),
+      }),
   },
 
   employees: {
