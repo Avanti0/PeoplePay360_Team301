@@ -1,7 +1,8 @@
-from datetime import date, datetime
+from datetime import datetime
 from decimal import Decimal
 from enum import Enum
 from typing import Optional
+from uuid import UUID
 from pydantic import BaseModel, ConfigDict
 
 
@@ -9,37 +10,33 @@ class AttendanceStatus(str, Enum):
     present  = "present"
     late     = "late"
     absent   = "absent"
-    half_day = "half_day"
-    on_leave = "on_leave"
+    overtime = "overtime"
 
 
 class AttendanceCreate(BaseModel):
-    employee_id: int
-    work_date: date
+    employee_id: UUID
     check_in: Optional[datetime] = None
     check_out: Optional[datetime] = None
     status: AttendanceStatus = AttendanceStatus.present
-    notes: Optional[str] = None
+    note: Optional[str] = None
 
 
 class AttendanceUpdate(BaseModel):
     check_in: Optional[datetime] = None
     check_out: Optional[datetime] = None
     status: Optional[AttendanceStatus] = None
-    notes: Optional[str] = None
+    note: Optional[str] = None
 
 
 class AttendanceOut(BaseModel):
-    id: int
-    employee_id: int
-    work_date: date
+    id: UUID
+    employee_id: UUID
     check_in: Optional[datetime] = None
     check_out: Optional[datetime] = None
-    worked_hours: Decimal
+    worked_hours: Optional[Decimal] = None
     status: AttendanceStatus
-    is_manual_correction: bool
-    corrected_by: Optional[int] = None
-    notes: Optional[str] = None
+    is_manual: bool
+    note: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 

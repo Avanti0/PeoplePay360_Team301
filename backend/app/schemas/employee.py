@@ -1,35 +1,25 @@
-from datetime import date, datetime
+from datetime import datetime
 from enum import Enum
 from typing import Optional
+from uuid import UUID
 from pydantic import BaseModel, EmailStr, ConfigDict
 
 
-class Gender(str, Enum):
-    male = "male"
-    female = "female"
-    other = "other"
-
-
 class EmploymentStatus(str, Enum):
-    active = "active"
+    active   = "active"
     inactive = "inactive"
-    terminated = "terminated"
+    on_leave = "on_leave"
 
 
 class EmployeeCreate(BaseModel):
-    employee_code: str
-    first_name: str
-    last_name: str
+    name: str
     email: EmailStr
     phone: Optional[str] = None
-    gender: Optional[Gender] = None
-    date_of_birth: Optional[date] = None
-    date_joined: date
-    department_id: Optional[int] = None
-    job_position_id: Optional[int] = None
-    manager_id: Optional[int] = None
-    working_schedule_id: Optional[int] = None
-    role_id: int
+    department: Optional[str] = None
+    job_position: Optional[str] = None
+    manager_id: Optional[UUID] = None
+    working_schedule_id: Optional[UUID] = None
+    user_id: Optional[UUID] = None  # links to an existing login account, if any
     employment_status: EmploymentStatus = EmploymentStatus.active
     bank_account_number: Optional[str] = None
     bank_name: Optional[str] = None
@@ -37,16 +27,13 @@ class EmployeeCreate(BaseModel):
 
 
 class EmployeeUpdate(BaseModel):
-    first_name: Optional[str] = None
-    last_name: Optional[str] = None
+    name: Optional[str] = None
     email: Optional[EmailStr] = None
     phone: Optional[str] = None
-    gender: Optional[Gender] = None
-    date_of_birth: Optional[date] = None
-    department_id: Optional[int] = None
-    job_position_id: Optional[int] = None
-    manager_id: Optional[int] = None
-    working_schedule_id: Optional[int] = None
+    department: Optional[str] = None
+    job_position: Optional[str] = None
+    manager_id: Optional[UUID] = None
+    working_schedule_id: Optional[UUID] = None
     employment_status: Optional[EmploymentStatus] = None
     bank_account_number: Optional[str] = None
     bank_name: Optional[str] = None
@@ -54,20 +41,15 @@ class EmployeeUpdate(BaseModel):
 
 
 class EmployeeOut(BaseModel):
-    id: int
-    employee_code: str
-    first_name: str
-    last_name: str
+    id: UUID
+    user_id: Optional[UUID] = None
+    name: str
     email: EmailStr
     phone: Optional[str] = None
-    gender: Optional[Gender] = None
-    date_of_birth: Optional[date] = None
-    date_joined: date
-    department_id: Optional[int] = None
-    job_position_id: Optional[int] = None
-    manager_id: Optional[int] = None
-    working_schedule_id: Optional[int] = None
-    role_id: int
+    department: Optional[str] = None
+    job_position: Optional[str] = None
+    manager_id: Optional[UUID] = None
+    working_schedule_id: Optional[UUID] = None
     employment_status: EmploymentStatus
     bank_account_number: Optional[str] = None
     bank_name: Optional[str] = None

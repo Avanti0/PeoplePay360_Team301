@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 from enum import Enum
 from typing import Optional
+from uuid import UUID
 
 class UserRole(str, Enum):
     employee             = "employee"
@@ -17,10 +18,10 @@ class UserCreate(BaseModel):
     username: str
     password: str
     role: UserRole
-    employee_id: Optional[int] = None
+    employee_id: Optional[UUID] = None  # existing employee to link this account to
 
 class UserOut(BaseModel):
-    id: int
+    id: UUID
     username: str
     role: UserRole
     is_active: bool

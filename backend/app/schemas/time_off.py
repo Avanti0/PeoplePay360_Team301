@@ -2,6 +2,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from enum import Enum
 from typing import Optional
+from uuid import UUID
 from pydantic import BaseModel, ConfigDict, field_validator
 
 
@@ -11,17 +12,17 @@ class TimeOffUnit(str, Enum):
 
 
 class AllocationStatus(str, Enum):
-    draft    = "draft"
-    approved = "approved"
-    refused  = "refused"
+    draft     = "draft"
+    confirmed = "confirmed"
+    approved  = "approved"
+    refused   = "refused"
 
 
 class TimeOffRequestStatus(str, Enum):
     draft     = "draft"
-    submitted = "submitted"
+    confirmed = "confirmed"
     approved  = "approved"
     refused   = "refused"
-    cancelled = "cancelled"
 
 
 # --- Time Off Types ---
@@ -30,7 +31,7 @@ class TimeOffTypeCreate(BaseModel):
     name: str
     unit: TimeOffUnit = TimeOffUnit.days
     requires_allocation: bool = True
-    affects_payroll: bool = True
+    approval_required: bool = True
     is_active: bool = True
 
 
@@ -38,64 +39,64 @@ class TimeOffTypeUpdate(BaseModel):
     name: Optional[str] = None
     unit: Optional[TimeOffUnit] = None
     requires_allocation: Optional[bool] = None
-    affects_payroll: Optional[bool] = None
+    approval_required: Optional[bool] = None
     is_active: Optional[bool] = None
 
 
 class TimeOffTypeOut(BaseModel):
-    id: int
+    id: UUID
     name: str
     unit: TimeOffUnit
     requires_allocation: bool
-    affects_payroll: bool
+    approval_required: bool
     is_active: bool
 
     model_config = ConfigDict(from_attributes=True)
 
 
-# --- Leave Allocations ---
+# --- Allocations ---
 
-class LeaveAllocationCreate(BaseModel):
-    employee_id: int
-    time_off_type_id: int
-    allocated_amount: Decimal
-    valid_from: date
-    valid_to: Optional[date] = None
+class AllocationCreate(BaseModel):
+    employee_id: UUID
+    time_off_type_id: UUID
+    number_of_days: Decimal
+    date_from: date
+    date_to: Optional[date] = None
     status: AllocationStatus = AllocationStatus.draft
 
-    @field_validator("allocated_amount")
+    @field_validator("number_of_days")
     @classmethod
     def amount_non_negative(cls, v):
         if v < 0:
-            raise ValueError("allocated_amount must be >= 0")
+            raise ValueError("number_of_days must be >= 0")
         return v
 
-    @field_validator("valid_to")
+    @field_validator("date_to")
     @classmethod
-    def valid_to_after_from(cls, v, info):
-        start = info.data.get("valid_from")
+    def date_to_after_from(cls, v, info):
+        start = info.data.get("date_from")
         if v is not None and start is not None and v < start:
-            raise ValueError("valid_to must be on or after valid_from")
+            raise ValueError("date_to must be on or after date_from")
         return v
 
 
-class LeaveAllocationUpdate(BaseModel):
-    allocated_amount: Optional[Decimal] = None
-    valid_from: Optional[date] = None
-    valid_to: Optional[date] = None
+class AllocationUpdate(BaseModel):
+    number_of_days: Optional[Decimal] = None
+    date_from: Optional[date] = None
+    date_to: Optional[date] = None
     status: Optional[AllocationStatus] = None
 
 
-class LeaveAllocationOut(BaseModel):
-    id: int
-    employee_id: int
-    time_off_type_id: int
-    allocated_amount: Decimal
-    taken_amount: Decimal
-    valid_from: date
-    valid_to: Optional[date] = None
+class AllocationOut(BaseModel):
+    id: UUID
+    employee_id: UUID
+    time_off_type_id: UUID
+    number_of_days: Decimal
+    taken: Decimal
+    remaining: Decimal
+    date_from: date
+    date_to: Optional[date] = None
     status: AllocationStatus
-    approved_by: Optional[int] = None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
@@ -104,19 +105,19 @@ class LeaveAllocationOut(BaseModel):
 # --- Time Off Requests ---
 
 class TimeOffRequestCreate(BaseModel):
-    employee_id: int
-    time_off_type_id: int
-    start_date: date
-    end_date: date
+    employee_id: UUID
+    time_off_type_id: UUID
+    date_from: date
+    date_to: date
     duration: Decimal
-    reason: Optional[str] = None
+    note: Optional[str] = None
 
-    @field_validator("end_date")
+    @field_validator("date_to")
     @classmethod
-    def end_after_start(cls, v, info):
-        start = info.data.get("start_date")
+    def date_to_after_from(cls, v, info):
+        start = info.data.get("date_from")
         if start is not None and v < start:
-            raise ValueError("end_date must be on or after start_date")
+            raise ValueError("date_to must be on or after date_from")
         return v
 
     @field_validator("duration")
@@ -128,26 +129,23 @@ class TimeOffRequestCreate(BaseModel):
 
 
 class TimeOffRequestUpdate(BaseModel):
-    start_date: Optional[date] = None
-    end_date: Optional[date] = None
+    date_from: Optional[date] = None
+    date_to: Optional[date] = None
     duration: Optional[Decimal] = None
-    reason: Optional[str] = None
+    note: Optional[str] = None
     status: Optional[TimeOffRequestStatus] = None
 
 
 class TimeOffRequestOut(BaseModel):
-    id: int
-    employee_id: int
-    time_off_type_id: int
-    allocation_id: Optional[int] = None
-    start_date: date
-    end_date: date
+    id: UUID
+    employee_id: UUID
+    time_off_type_id: UUID
+    allocation_id: Optional[UUID] = None
+    date_from: date
+    date_to: date
     duration: Decimal
     status: TimeOffRequestStatus
-    reason: Optional[str] = None
-    approved_by: Optional[int] = None
-    approved_at: Optional[datetime] = None
+    note: Optional[str] = None
     created_at: datetime
-    updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
