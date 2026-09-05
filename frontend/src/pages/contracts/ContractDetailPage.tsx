@@ -118,7 +118,7 @@ export const ContractDetailPage: React.FC = () => {
               <StatusBadge status={contract.status} />
             </div>
             <p className="text-xs text-slate-500">
-              Employment agreement for {contract.employeeName} ({contract.employeeCode})
+              Employment agreement for {contract.employeeName}
             </p>
           </div>
         </div>
@@ -162,13 +162,12 @@ export const ContractDetailPage: React.FC = () => {
                 <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-100">
                   <span className="text-slate-400 font-semibold block text-[11px] mb-1">Employee</span>
                   <span className="font-bold text-slate-900 text-sm">{contract.employeeName}</span>
-                  <span className="text-slate-500 block text-[10px] mt-0.5">{contract.employeeCode}</span>
                 </div>
 
                 <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-100">
                   <span className="text-slate-400 font-semibold block text-[11px] mb-1">Department & Role</span>
-                  <span className="font-bold text-slate-900 text-sm">{contract.jobPositionTitle || 'Software Engineer'}</span>
-                  <span className="text-slate-500 block text-[10px] mt-0.5">{contract.departmentName || 'Engineering'}</span>
+                  <span className="font-bold text-slate-900 text-sm">{contract.jobPosition || 'Software Engineer'}</span>
+                  <span className="text-slate-500 block text-[10px] mt-0.5">{contract.department || 'Engineering'}</span>
                 </div>
 
                 <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-100">
@@ -219,9 +218,6 @@ export const ContractDetailPage: React.FC = () => {
                     <span className="text-slate-400 text-[11px] block">Salary Structure</span>
                     <span className="font-bold text-slate-800 text-xs">
                       {structure?.name || contract.salaryStructureName || 'Regular Salary'}
-                    </span>
-                    <span className="text-[10px] text-blue-600 block mt-0.5 font-mono">
-                      {structure?.code || 'REG'}
                     </span>
                   </div>
                   <div className="p-3 rounded-xl border border-slate-200">

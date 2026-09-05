@@ -261,9 +261,7 @@ export const PayrunDetailPage: React.FC = () => {
               <div key={s.id} className="text-xs text-amber-800 flex items-center gap-2">
                 <span className="font-bold">{s.employeeName}:</span>
                 <span>
-                  {Array.isArray(s.warnings)
-                    ? s.warnings.map((w) => (typeof w === 'string' ? w : w.message)).join('; ')
-                    : 'Missing details'}
+                  {Array.isArray(s.warnings) ? s.warnings.join('; ') : 'Missing details'}
                 </span>
               </div>
             ))}
@@ -304,7 +302,7 @@ export const PayrunDetailPage: React.FC = () => {
                   <td className="py-3 px-4">
                     <div>
                       <p className="font-bold text-slate-900">{slip.employeeName}</p>
-                      <p className="text-[10px] text-slate-400">{slip.employeeCode}</p>
+                      <p className="text-[10px] text-slate-400">{slip.departmentName}</p>
                     </div>
                   </td>
                   <td className="py-3 px-4 text-slate-600">{slip.jobPositionTitle || 'Staff'}</td>
@@ -313,7 +311,7 @@ export const PayrunDetailPage: React.FC = () => {
                     {formatCurrency(slip.grossSalary)}
                   </td>
                   <td className="py-3 px-4 font-bold text-rose-600">
-                    {formatCurrency(slip.totalDeductions)}
+                    {formatCurrency(slip.grossSalary - slip.netSalary)}
                   </td>
                   <td className="py-3 px-4">
                     <span className="font-extrabold text-blue-600 text-sm">

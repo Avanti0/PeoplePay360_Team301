@@ -21,7 +21,7 @@ export const Header: React.FC<{ title?: string }> = ({ title }) => {
   const handleQuickClock = async () => {
     if (clockedIn) {
       await api.attendance.create({
-        employeeId: user?.employeeId || 2,
+        employeeId: user?.employeeId || '2',
         checkIn: new Date(Date.now() - 8 * 3600000).toISOString(),
         checkOut: new Date().toISOString(),
         status: 'present',
@@ -30,7 +30,7 @@ export const Header: React.FC<{ title?: string }> = ({ title }) => {
       success(`Checked out successfully at ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`);
     } else {
       await api.attendance.create({
-        employeeId: user?.employeeId || 2,
+        employeeId: user?.employeeId || '2',
         checkIn: new Date().toISOString(),
         status: 'present',
       });

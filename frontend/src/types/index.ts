@@ -2,67 +2,70 @@
 // PeoplePay360 Frontend Types & Interfaces
 // Follows camelCase conventions while mapping to/from backend snake_case.
 // Source of truth: docs/spec.md, docs/architecture.md, status.md, schema.sql
+//
+// department/jobPosition are plain free-text fields on Employee/Contract
+// (see docs/modules/employee.md, contract.md) - there is no Department
+// or JobPosition entity in the database. The Department/JobPosition
+// interfaces below exist purely as a frontend-side reference list for
+// populating dropdown options; they are not backed by a real table.
 // =====================================================================
 
-export type RoleName = 
+export type RoleName =
   | 'employee'
   | 'hr_manager'
   | 'hr_payroll_user'
   | 'hr_payroll_manager'
   | 'admin';
 
-export type EmploymentStatus = 'active' | 'inactive' | 'on_leave' | 'terminated';
+export type EmploymentStatus = 'active' | 'inactive' | 'on_leave';
 
-export type ContractStatus = 'draft' | 'active' | 'running' | 'expired' | 'cancelled';
+export type ContractStatus = 'draft' | 'active' | 'expired' | 'cancelled';
 
-export type AttendanceStatus = 'present' | 'late' | 'absent' | 'overtime' | 'half_day' | 'on_leave';
+export type AttendanceStatus = 'present' | 'late' | 'absent' | 'overtime';
 
 export type TimeOffUnit = 'days' | 'hours';
 
 export type AllocationStatus = 'draft' | 'confirmed' | 'approved' | 'refused';
 
-export type TimeOffRequestStatus = 'draft' | 'confirmed' | 'submitted' | 'approved' | 'refused' | 'cancelled';
+export type TimeOffRequestStatus = 'draft' | 'confirmed' | 'approved' | 'refused';
 
-export type SalaryRuleCategory = 'basic' | 'allowance' | 'gross' | 'deduction' | 'net' | 'other';
+export type SalaryRuleCategory = 'basic' | 'allowance' | 'gross' | 'deduction' | 'net';
 
-export type ComputationMethod = 'fixed' | 'percentage' | 'formula';
+export type ComputationType = 'fixed' | 'percentage' | 'formula';
 
 export type PayrunStatus = 'draft' | 'computed' | 'validated' | 'paid';
 
 export type PayslipStatus = 'draft' | 'computed' | 'validated' | 'paid';
 
 export interface User {
-  id: string | number;
+  id: string;
   username: string;
   role: RoleName;
-  employeeId?: string | number;
+  employeeId?: string;
   employeeName?: string;
   email?: string;
   isActive: boolean;
   lastLoginAt?: string;
 }
 
+// Frontend-only reference lists (not real backend entities - see file header).
 export interface Department {
   id: string | number;
   name: string;
   code?: string;
-  managerId?: string | number;
   managerName?: string;
   employeeCount?: number;
-  createdAt?: string;
 }
 
 export interface JobPosition {
   id: string | number;
   title: string;
-  departmentId?: string | number;
   departmentName?: string;
-  createdAt?: string;
 }
 
 export interface WorkingScheduleLine {
-  id?: string | number;
-  scheduleId?: string | number;
+  id?: string;
+  scheduleId?: string;
   dayOfWeek: number; // 0 = Monday ... 6 = Sunday
   isWorkingDay: boolean;
   startTime?: string | null;
@@ -71,36 +74,27 @@ export interface WorkingScheduleLine {
 }
 
 export interface WorkingSchedule {
-  id: string | number;
+  id: string;
   name: string;
-  scheduleType: 'full_time' | 'part_time' | 'shift';
   isActive: boolean;
-  weeklyHours: number;
+  weeklyHours?: number; // client-computed from lines, not a stored column
   lines: WorkingScheduleLine[];
   createdAt?: string;
 }
 
 export interface Employee {
-  id: string | number;
-  employeeCode: string;
-  firstName: string;
-  lastName: string;
-  name?: string; // computed helper
+  id: string;
+  userId?: string | null;
+  name: string;
   email: string;
   phone?: string;
-  gender?: 'male' | 'female' | 'other';
-  dateOfBirth?: string;
-  dateJoined: string;
-  departmentId?: string | number;
-  departmentName?: string;
-  jobPositionId?: string | number;
-  jobTitle?: string;
-  managerId?: string | number;
+  department?: string;
+  jobPosition?: string;
+  managerId?: string | null;
   managerName?: string;
-  workingScheduleId?: string | number;
+  workingScheduleId?: string | null;
   workingScheduleName?: string;
-  roleId?: string | number;
-  roleName?: RoleName;
+  roleName?: RoleName; // from the linked user account, if any
   employmentStatus: EmploymentStatus;
   bankAccountNumber?: string;
   bankName?: string;
@@ -111,104 +105,86 @@ export interface Employee {
 }
 
 export interface Contract {
-  id: string | number;
-  employeeId: string | number;
+  id: string;
+  employeeId: string;
   employeeName?: string;
-  employeeCode?: string;
-  dateStart: string; // matches status.md date_start
-  dateEnd?: string | null; // matches status.md date_end
+  dateStart: string;
+  dateEnd?: string | null;
   wage: number;
-  departmentId?: string | number;
-  departmentName?: string;
-  jobPositionId?: string | number;
-  jobPositionTitle?: string;
-  workingScheduleId?: string | number;
+  department?: string;
+  jobPosition?: string;
+  workingScheduleId?: string | null;
   workingScheduleName?: string;
-  salaryStructureId?: string | number;
+  salaryStructureId?: string | null;
   salaryStructureName?: string;
-  employmentType?: 'permanent' | 'contract' | 'intern';
   status: ContractStatus;
   createdAt?: string;
   updatedAt?: string;
 }
 
 export interface AttendanceRecord {
-  id: string | number;
-  employeeId: string | number;
+  id: string;
+  employeeId: string;
   employeeName?: string;
-  employeeCode?: string;
   departmentName?: string;
-  workDate: string;
   checkIn?: string | null;
   checkOut?: string | null;
-  workedHours: number;
+  workedHours?: number | null;
   status: AttendanceStatus;
-  isManual: boolean; // matches status.md / is_manual_correction
-  correctedBy?: string | number | null;
-  correctedByName?: string;
+  isManual: boolean;
   note?: string | null;
   createdAt?: string;
   updatedAt?: string;
 }
 
 export interface TimeOffType {
-  id: string | number;
+  id: string;
   name: string;
   unit: TimeOffUnit;
   requiresAllocation: boolean;
-  affectsPayroll?: boolean;
   approvalRequired?: boolean;
   isActive: boolean;
 }
 
 export interface Allocation {
-  id: string | number;
-  employeeId: string | number;
+  id: string;
+  employeeId: string;
   employeeName?: string;
-  employeeCode?: string;
-  timeOffTypeId: string | number;
+  timeOffTypeId: string;
   timeOffTypeName?: string;
-  numberOfDays: number; // matches status.md number_of_days / allocated_amount
-  taken: number; // matches status.md taken
-  remaining: number; // matches status.md remaining
-  dateFrom: string; // matches status.md date_from / valid_from
-  dateTo?: string | null; // matches status.md date_to / valid_to
+  numberOfDays: number;
+  taken: number;
+  remaining: number; // DB-generated (number_of_days - taken); read-only
+  dateFrom: string;
+  dateTo?: string | null;
   status: AllocationStatus;
-  approvedBy?: string | number | null;
-  approvedByName?: string;
   createdAt?: string;
 }
 
 export interface TimeOffRequest {
-  id: string | number;
-  employeeId: string | number;
+  id: string;
+  employeeId: string;
   employeeName?: string;
-  employeeCode?: string;
   departmentName?: string;
-  timeOffTypeId: string | number;
+  timeOffTypeId: string;
   timeOffTypeName?: string;
-  allocationId?: string | number | null;
-  dateFrom: string; // matches status.md / start_date
-  dateTo: string; // matches status.md / end_date
+  allocationId?: string | null;
+  dateFrom: string;
+  dateTo: string;
   duration: number;
   status: TimeOffRequestStatus;
   note?: string | null;
-  reason?: string | null;
-  approvedBy?: string | number | null;
-  approvedByName?: string;
-  approvedAt?: string | null;
   createdAt?: string;
-  updatedAt?: string;
 }
 
 export interface SalaryRule {
-  id: string | number;
-  salaryStructureId: string | number;
+  id: string;
+  salaryStructureId: string;
   name: string;
   code: string;
   category: SalaryRuleCategory;
   sequence: number;
-  computationType: ComputationMethod;
+  computationType: ComputationType;
   amount?: number | null;
   percentageBase?: string | null; // e.g. "BASIC"
   percentage?: number | null;
@@ -217,10 +193,8 @@ export interface SalaryRule {
 }
 
 export interface SalaryStructure {
-  id: string | number;
+  id: string;
   name: string;
-  code?: string;
-  description?: string;
   isActive: boolean;
   rules?: SalaryRule[];
   rulesCount?: number;
@@ -228,30 +202,26 @@ export interface SalaryStructure {
 }
 
 export interface Payrun {
-  id: string | number;
+  id: string;
   name: string;
-  salaryStructureId: string | number;
+  salaryStructureId: string;
   salaryStructureName?: string;
-  periodStart: string; // matches status.md period_start
-  periodEnd: string; // matches status.md period_end
+  periodStart: string;
+  periodEnd: string;
   status: PayrunStatus;
   employeeCount?: number;
   totalGross?: number;
   totalDeductions?: number;
   totalNet?: number;
   warningsCount?: number;
-  createdBy?: string | number;
-  computedAt?: string | null;
-  validatedAt?: string | null;
-  paidAt?: string | null;
   createdAt?: string;
   updatedAt?: string;
 }
 
 export interface PayslipLine {
-  id: string | number;
-  payslipId: string | number;
-  salaryRuleId?: string | number;
+  id: string;
+  payslipId: string;
+  salaryRuleId?: string | null;
   code: string;
   name: string;
   category: SalaryRuleCategory;
@@ -259,41 +229,26 @@ export interface PayslipLine {
   amount: number;
 }
 
-export interface PayrollWarning {
-  id: string | number;
-  payslipId: string | number;
-  employeeId?: string | number;
-  employeeName?: string;
-  warningType: string;
-  message: string;
-  createdAt?: string;
-}
-
 export interface Payslip {
-  id: string | number;
-  payrunId: string | number;
+  id: string;
+  payrunId: string;
   payrunName?: string;
-  employeeId: string | number;
+  employeeId: string;
   employeeName?: string;
-  employeeCode?: string;
   departmentName?: string;
   jobPositionTitle?: string;
   bankAccountNumber?: string;
   bankName?: string;
-  contractId?: string | number;
+  contractId?: string | null;
   periodStart: string;
   periodEnd: string;
   workedDays: number;
-  grossSalary: number; // matches status.md gross_salary
-  totalDeductions: number;
-  netSalary: number; // matches status.md net_salary
+  grossSalary: number;
+  netSalary: number;
   status: PayslipStatus;
-  warnings?: (string | PayrollWarning)[];
+  warnings?: string[]; // stored as JSONB list of warning strings (payroll.md)
   lines?: PayslipLine[];
-  pdfPath?: string | null;
-  emailedAt?: string | null;
   createdAt?: string;
-  updatedAt?: string;
 }
 
 export interface DashboardKPIs {
@@ -318,4 +273,13 @@ export interface MonthlySalaryTrend {
   gross: number;
   net: number;
   deductions: number;
+}
+
+export interface DashboardAlert {
+  id: string;
+  payslipId?: string;
+  warningType: string;
+  employeeId?: string;
+  employeeName?: string;
+  message: string;
 }

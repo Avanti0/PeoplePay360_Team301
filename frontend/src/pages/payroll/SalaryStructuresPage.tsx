@@ -138,11 +138,7 @@ export const SalaryStructuresPage: React.FC = () => {
                 >
                   <div className="flex items-center justify-between">
                     <h4 className="text-sm font-bold text-slate-900">{s.name}</h4>
-                    <span className="text-[10px] font-bold uppercase bg-blue-100 text-blue-700 px-2 py-0.5 rounded">
-                      {s.code || 'REG'}
-                    </span>
                   </div>
-                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">{s.description}</p>
                   <div className="mt-2 text-[11px] font-semibold text-slate-600">
                     {currentRules.length} Sequenced Rules
                   </div>

@@ -129,7 +129,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const switchUserRole = (targetRole: RoleName) => {
     const matched = demoUsers.find((u) => u.role === targetRole) || {
-      id: 999,
+      id: '999',
       username: `demo.${targetRole}`,
       role: targetRole,
       employeeName: `Demo ${targetRole.replace(/_/g, ' ').toUpperCase()}`,

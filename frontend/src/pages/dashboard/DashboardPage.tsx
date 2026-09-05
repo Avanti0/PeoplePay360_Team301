@@ -5,7 +5,7 @@ import {
   DashboardKPIs,
   DepartmentSalaryCost,
   MonthlySalaryTrend,
-  PayrollWarning,
+  DashboardAlert,
 } from '../../types';
 import { KpiCard } from '../../components/common/KpiCard';
 import { useAuth } from '../../context/AuthContext';
@@ -30,7 +30,7 @@ export const DashboardPage: React.FC = () => {
   const [kpis, setKpis] = useState<DashboardKPIs | null>(null);
   const [deptCosts, setDeptCosts] = useState<DepartmentSalaryCost[]>([]);
   const [salaryTrend, setSalaryTrend] = useState<MonthlySalaryTrend[]>([]);
-  const [alerts, setAlerts] = useState<PayrollWarning[]>([]);
+  const [alerts, setAlerts] = useState<DashboardAlert[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
