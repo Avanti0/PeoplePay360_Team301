@@ -308,8 +308,6 @@ CREATE TABLE allocations (
     employee_id       UUID NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
     time_off_type_id  UUID NOT NULL REFERENCES time_off_types(id),
     number_of_days    NUMERIC(6, 2) NOT NULL CHECK (number_of_days >= 0),
-    taken             NUMERIC(6, 2) NOT NULL DEFAULT 0 CHECK (taken >= 0),
-    remaining         NUMERIC(6, 2) GENERATED ALWAYS AS (number_of_days - taken) STORED,
     date_from         DATE NOT NULL,
     date_to           DATE,
     status            allocation_status_enum NOT NULL DEFAULT 'draft',
