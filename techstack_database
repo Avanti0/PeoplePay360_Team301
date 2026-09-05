@@ -1,51 +1,62 @@
 # Tech Stack - feature/database (Maddi Soumya)
 
 Database Engine : PostgreSQL (local server install; not a cloud service)
-Driver / Access : node-postgres (`pg` npm package) - pure JavaScript
-                  wire-protocol client, no native/compiled dependency
-Schema          : Plain SQL DDL file (database/schema.sql) using native
-                  Postgres ENUM types, TIMESTAMPTZ/DATE, and NUMERIC for
-                  exact-precision money math. Applied via a Node
-                  migration runner (database/migrate.js), which also
-                  creates the target database if it does not exist yet.
-Seed Data       : Programmatic seed script (database/seed.js) generating
-                  real relational demo records (not static JSON)
-Tooling scripts : database/reset.js (migrate + seed in one step),
-                  database/verify.js (row-count + business-rule sanity
-                  checks)
+Setup Tooling   : node-postgres (`pg` npm package) - pure JavaScript
+                  wire-protocol client used only by the bootstrap
+                  scripts in database/ (migrate/seed/reset/verify), not
+                  the application's runtime data layer, which is
+                  Python/FastAPI + SQLAlchemy per docs/spec.md
+Schema          : Plain SQL DDL file (database/schema.sql) using UUID
+                  primary keys (gen_random_uuid(), built into Postgres
+                  core since v13), native ENUM types, DATE/TIMESTAMPTZ,
+                  and NUMERIC for exact-precision money math
+Seed Data       : Plain SQL INSERT statements (database/seed.sql) with
+                  fixed, readable UUID literals - not static JSON
+Tooling scripts : database/migrate.js (creates db + applies schema.sql),
+                  database/seed.js (applies seed.sql),
+                  database/reset.js (migrate + seed in one step),
+                  database/verify.js (row-count + business-rule checks)
 Config          : .env (git-ignored, per-developer) + config.js, using
                   standard PGHOST/PGPORT/PGUSER/PGPASSWORD/PGDATABASE
                   environment variables
+
+Naming/shape note: this schema was rewritten once already to match the
+team-agreed conventions in status.md and docs/modules/*.md (UUID ids,
+employees.name instead of first/last name, department/job_position as
+plain text instead of separate tables, contract date_start/date_end,
+contract status "active" not "running", allocations/schedule_lines
+table names, payslip warnings as a JSONB column, etc.). If a name here
+looks unusual, check those docs first - it's intentional, not a typo.
 
 Why this stack:
 - Full relational database engine with native enum types, exact-numeric
   money columns, and constraints/triggers enforced by the server itself.
 - Still fully local - runs on a PostgreSQL server installed on your own
   machine, no cloud database account required.
-- No native build tooling needed to install the driver (pg is pure JS),
-  unlike better-sqlite3 which failed to build on this machine due to a
-  missing Visual Studio toolchain.
+- No native build tooling needed to install the setup driver (pg is
+  pure JS), unlike better-sqlite3 which failed to build on this machine
+  due to a missing Visual Studio toolchain.
+- schema.sql/seed.sql are plain SQL, so they double as init scripts the
+  official postgres Docker image can run automatically (NFR-06) and
+  can be applied with plain `psql` if someone doesn't want Node at all.
 - A real, dynamic, queryable relational database (not static JSON),
   satisfying the "use real-time/dynamic data sources" requirement.
-- Portable schema.sql / seed.js that feature/backend (Avanti) can point
-  any Node-based API layer at directly (reusing the same env vars), and
-  feature/frontend (Vyshnavi) can inspect with any Postgres client
-  (pgAdmin, DBeaver, psql) while the API is being built.
 
 Where things live:
   PeoplePay360_Team301/database/
-    schema.sql   - full DDL: employees, departments, job positions,
-                   working schedules, contracts (period-aware, with
+    schema.sql   - full DDL: users, employees, working schedules,
+                   schedule lines, contracts (period-aware, with
                    overlap-prevention trigger), attendance, time off
                    types/allocations/requests, salary structures/rules,
-                   payruns/payslips/payslip lines, payroll warnings,
-                   roles/users (RBAC)
+                   payruns/payrun_employees/payslips/payslip lines
+    seed.sql     - demo data reproducing the README's worked examples
+                   (contract resolution, leave balance flow)
     migrate.js   - creates the database (if missing) and applies schema.sql
-    seed.js      - inserts demo data reproducing the README's worked
-                   examples (contract resolution, leave balance flow)
+    seed.js      - applies seed.sql
     reset.js     - one-shot: migrate + seed
     verify.js    - prints row counts and checks key business rules
     config.js    - loads .env and centralizes PG connection config
+    errors.js    - unwraps pg/Node connection errors into a readable message
     .env.example - template for local Postgres connection credentials
     README.md    - setup + usage instructions for the rest of the team
 
