@@ -89,7 +89,7 @@ export const ContractDetailPage: React.FC = () => {
     return (
       <div className="text-center py-12">
         <h3 className="text-base font-bold text-slate-800">Contract Not Found</h3>
-        <p className="text-xs text-slate-500 mt-1">The requested contract #{id} does not exist.</p>
+        <p className="text-xs text-slate-500 mt-1">The requested contract does not exist.</p>
         <Link to="/contracts" className="mt-4 inline-block text-xs text-blue-600 font-bold hover:underline">
           &larr; Back to Contracts
         </Link>
@@ -113,7 +113,7 @@ export const ContractDetailPage: React.FC = () => {
           <div>
             <div className="flex items-center gap-2">
               <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">
-                Contract #{contract.id}
+                Employment Contract
               </h2>
               <StatusBadge status={contract.status} />
             </div>
@@ -274,10 +274,6 @@ export const ContractDetailPage: React.FC = () => {
             </CardHeader>
             <CardContent>
               <div className="space-y-2 text-xs text-slate-600">
-                <div className="flex justify-between py-1 border-b border-slate-100">
-                  <span className="text-slate-400">Contract ID:</span>
-                  <span className="font-mono font-bold">#{contract.id}</span>
-                </div>
                 <div className="flex justify-between py-1 border-b border-slate-100">
                   <span className="text-slate-400">Created:</span>
                   <span>{contract.createdAt || '2026-09-01'}</span>

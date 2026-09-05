@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Menu, Bell, Search, Sparkles } from 'lucide-react';
+import { Menu, Bell, Search } from 'lucide-react';
 import { Breadcrumbs } from './Breadcrumbs';
 import { UserMenu } from './UserMenu';
 
@@ -47,12 +47,6 @@ export const Topbar: React.FC<TopbarProps> = ({
             className="w-56 pl-8 pr-3 py-1.5 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
           />
         </div>
-
-        {/* Live Demo Mode Badge */}
-        <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-bold bg-blue-50 text-blue-700 px-2.5 py-1 rounded-xl border border-blue-200/60">
-          <Sparkles className="w-3 h-3 text-blue-500" />
-          <span>Live Demo</span>
-        </span>
 
         {/* Notifications Icon */}
         <button

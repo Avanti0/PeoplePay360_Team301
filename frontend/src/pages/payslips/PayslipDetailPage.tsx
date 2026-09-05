@@ -109,9 +109,6 @@ export const PayslipDetailPage: React.FC = () => {
           </div>
 
           <div className="text-right">
-            <span className="text-xs font-mono font-bold bg-slate-100 px-3 py-1 rounded-lg border border-slate-200">
-              PAYSLIP #{payslip.id}
-            </span>
             <p className="text-xs text-slate-500 mt-2">
               Period:{' '}
               <strong className="text-slate-800">
