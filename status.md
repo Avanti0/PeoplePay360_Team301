@@ -87,16 +87,21 @@ This file lives on `main`. Update it every time you reach a meaningful commit po
 
 | Module                  | Database         | Backend          | Frontend         |
 |-------------------------|------------------|------------------|------------------|
-| Employee Management     | ⬜ Not started   | ⬜ Not started   | ⬜ Not started   |
-| Contract Management     | ⬜ Not started   | ⬜ Not started   | ⬜ Not started   |
+| Employee Management     | ⬜ Not started   | 🔄 In progress   | ⬜ Not started   |
+| Contract Management     | ⬜ Not started   | 🔄 In progress   | ⬜ Not started   |
 | Working Schedules       | ⬜ Not started   | ⬜ Not started   | ⬜ Not started   |
-| Attendance              | ⬜ Not started   | ⬜ Not started   | ⬜ Not started   |
-| Time Off                | ⬜ Not started   | ⬜ Not started   | ⬜ Not started   |
+| Attendance              | ⬜ Not started   | 🔄 In progress   | ⬜ Not started   |
+| Time Off                | ⬜ Not started   | 🔄 In progress   | ⬜ Not started   |
 | Salary Structures/Rules | ⬜ Not started   | ⬜ Not started   | ⬜ Not started   |
 | Payrun Processing       | ⬜ Not started   | ⬜ Not started   | ⬜ Not started   |
 | Payslip Generation      | ⬜ Not started   | ⬜ Not started   | ⬜ Not started   |
 | Payroll Dashboard       | ⬜ Not started   | ⬜ Not started   | ⬜ Not started   |
-| Auth / RBAC             | ⬜ Not started   | ⬜ Not started   | ⬜ Not started   |
+| Auth / RBAC             | ⬜ Not started   | 🔄 In progress   | ⬜ Not started   |
+
+Backend note: models + CRUD/RBAC routers exist for Employee/Contract/Attendance/Time Off
+(incl. the leave-approval → balance-deduction flow) and match `feature/database`'s real
+`schema.sql`. Marked "In progress" rather than "Done" — not yet smoke-tested against a
+live Postgres instance. Salary Structures/Rules and the Payrun engine are next.
 
 Status key: ⬜ Not started | 🔄 In progress | ✅ Done | 🔀 Merged to main
 

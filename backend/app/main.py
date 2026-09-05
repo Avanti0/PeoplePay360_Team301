@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import auth
+import app.models  # noqa: F401  (registers all mapped classes before first query)
+from app.routers import auth, employees, contracts, attendance, time_off
 
 app = FastAPI(title="PeoplePay360 API", version="1.0.0")
 
@@ -13,6 +14,12 @@ app.add_middleware(
 )
 
 app.include_router(auth.router)
+app.include_router(employees.router)
+app.include_router(contracts.router)
+app.include_router(attendance.router)
+app.include_router(time_off.types_router)
+app.include_router(time_off.allocations_router)
+app.include_router(time_off.requests_router)
 
 @app.get("/health")
 def health():

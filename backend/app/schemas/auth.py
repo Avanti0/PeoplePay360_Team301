@@ -1,5 +1,6 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 from enum import Enum
+from typing import Optional
 
 class UserRole(str, Enum):
     employee             = "employee"
@@ -13,13 +14,14 @@ class TokenOut(BaseModel):
     token_type: str = "bearer"
 
 class UserCreate(BaseModel):
-    email: EmailStr
+    username: str
     password: str
     role: UserRole
+    employee_id: Optional[int] = None
 
 class UserOut(BaseModel):
-    id: str
-    email: EmailStr
+    id: int
+    username: str
     role: UserRole
     is_active: bool
 
