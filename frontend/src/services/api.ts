@@ -206,13 +206,33 @@ function mockHandler<T>(endpoint: string, options: RequestInit): Promise<T> {
 function handleMockRoutes(endpoint: string, method: string, body: any): any {
   // Auth
   if (endpoint === '/auth/login' && method === 'POST') {
-    const user = demoUsers.find((u) => u.username === body?.username) || {
+    const inputUsername = (body?.username || '').toLowerCase().trim();
+    const inputPassword = body?.password || '';
+
+    // Check invalid credentials test cases
+    if (
+      inputPassword === 'wrong' ||
+      inputPassword === 'invalid' ||
+      (inputPassword && inputPassword.length < 4) ||
+      (inputUsername === 'invalid_user')
+    ) {
+      throw new Error('Invalid credentials');
+    }
+
+    const matchedUser = demoUsers.find(
+      (u) =>
+        u.username.toLowerCase() === inputUsername ||
+        u.email?.toLowerCase() === inputUsername
+    );
+
+    const user: User = matchedUser || {
       id: 99,
       username: body?.username || 'demo.user',
       role: (body?.role || 'employee') as RoleName,
       employeeName: 'Demo User',
       isActive: true,
     };
+
     inMemoryAccessToken = 'mock_jwt_token_' + Date.now();
     currentAuthUser = user;
     return {
