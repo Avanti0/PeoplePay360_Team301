@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.core.dependencies import require_hr_payroll_user, require_hr_payroll_manager, require_admin
@@ -8,6 +9,8 @@ from app.schemas.payroll import (
     PayrunCreate, PayrunOut, PayslipOut,
 )
 from app.services import payroll_service as svc
+from app.services.pdf_service import generate_payslip_pdf
+from app.services.email_service import send_payslips_bulk
 
 # ── Salary Structures ─────────────────────────────────────────────────────────
 structures_router = APIRouter(prefix="/api/v1/salary-structures", tags=["salary-structures"])
@@ -80,6 +83,10 @@ def validate(payrun_id: int, db: Session = Depends(get_db), _=Depends(require_hr
 def mark_paid(payrun_id: int, db: Session = Depends(get_db), _=Depends(require_hr_payroll_manager)):
     return svc.mark_paid(db, payrun_id)
 
+@payruns_router.post("/{payrun_id}/send-payslips")
+def send_payslips(payrun_id: int, db: Session = Depends(get_db), _=Depends(require_hr_payroll_manager)):
+    return send_payslips_bulk(db, payrun_id)
+
 
 # ── Payslips ──────────────────────────────────────────────────────────────────
 payslips_router = APIRouter(prefix="/api/v1/payslips", tags=["payslips"])
@@ -91,3 +98,9 @@ def list_payslips(payrun_id: int = None, employee_id: int = None, db: Session = 
 @payslips_router.get("/{payslip_id}", response_model=PayslipOut)
 def get_payslip(payslip_id: int, db: Session = Depends(get_db), _=Depends(require_hr_payroll_user)):
     return svc.get_payslip(db, payslip_id)
+
+@payslips_router.get("/{payslip_id}/pdf")
+def download_pdf(payslip_id: int, db: Session = Depends(get_db), _=Depends(require_hr_payroll_user)):
+    path = generate_payslip_pdf(db, payslip_id)
+    return FileResponse(path, media_type="application/pdf",
+                        filename=f"payslip_{payslip_id}.pdf")
