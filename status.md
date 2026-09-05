@@ -91,10 +91,10 @@ This file lives on `main`. Update it every time you reach a meaningful commit po
 | Contract Management     | ✅ Done          | 🔄 In progress   | ✅ Done          |
 | Working Schedules       | ✅ Done          | ⬜ Not started   | ✅ Done          |
 | Attendance              | ✅ Done          | 🔄 In progress   | ✅ Done          |
-| Time Off                | ✅ Done          | 🔄 In progress   | ⬜ Not started   |
+| Time Off                | ✅ Done          | 🔄 In progress   | ✅ Done          |
 | Salary Structures/Rules | ✅ Done          | ⬜ Not started   | ✅ Done          |
 | Payrun Processing       | ✅ Done          | ⬜ Not started   | ✅ Done          |
-| Payslip Generation      | ⬜ Not started   | ⬜ Not started   | ⬜ Not started   |
+| Payslip Generation      | ⬜ Not started   | ⬜ Not started   | ✅ Done          |
 | Payroll Dashboard       | ⬜ Not started   | ⬜ Not started   | ✅ Done          |
 | Auth / RBAC             | ✅ Done          | 🔄 In progress   | ✅ Done          |
 
