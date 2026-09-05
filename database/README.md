@@ -6,23 +6,34 @@ This folder is the complete data layer for PeoplePay360: schema,
 migration runner, demo seed data, and a verification script, running
 against a local PostgreSQL server.
 
+Field/table names, enum values, and the entity-relationship shape here
+follow the conventions agreed in the repo's `status.md` and
+`docs/modules/*.md` (written by the team after the first version of
+this schema existed) - so this is the second, spec-aligned revision.
+If you're wondering why a name looks unusual (e.g. `date_start` instead
+of `start_date`, or department/job_position as plain text instead of a
+foreign key), it's because it mirrors those docs exactly - check there
+before assuming a naming choice was arbitrary.
+
 ## Tech Stack
 
 | Concern              | Choice                                   | Why |
 |-----------------------|-------------------------------------------|-----|
-| Database engine       | PostgreSQL (local server)                  | Full relational engine with native enum types, real numeric precision for money, arrays/JSON if ever needed, and a mature ecosystem the rest of the team (and most job/interview contexts) already knows. Runs entirely on your own machine - no cloud account required. |
-| Driver                | [`pg`](https://node-postgres.com/) (`node-postgres`) | The standard Node.js Postgres client. Pure JavaScript wire-protocol implementation - no native/compiled addon, so `npm install` never needs a C++ build toolchain. |
-| Schema definition     | Plain `schema.sql` (DDL)                   | Portable, reviewable, easy for feature/backend to read directly or re-run against their own copy. Uses native Postgres `ENUM` types, `TIMESTAMPTZ`, `DATE`, and `NUMERIC` for exact-precision money math. |
-| Seed data             | `seed.js` (programmatic inserts)           | Produces real, relational, dynamic demo records (not static JSON) so feature/backend and feature/frontend can develop against actual query results. |
-| Config                | `.env` (git-ignored) + `config.js`         | Standard `PGHOST`/`PGPORT`/`PGUSER`/`PGPASSWORD`/`PGDATABASE` env vars, so every teammate points at their own local Postgres install without touching code, and feature/backend can reuse the exact same env vars for its own connection pool. |
+| Database engine       | PostgreSQL (local server)                  | Full relational engine with native enum types, real numeric precision for money, and a mature ecosystem. Runs entirely on your own machine - no cloud account required. Matches `docs/spec.md`'s stack table. |
+| Driver                | [`pg`](https://node-postgres.com/) (`node-postgres`) | Pure JavaScript wire-protocol client for the setup/seed tooling in this folder - no native/compiled addon, so `npm install` never needs a C++ build toolchain. (The actual backend is Python/FastAPI + SQLAlchemy per `docs/spec.md`; this `pg`-based tooling only bootstraps the database, it isn't the app's runtime data layer.) |
+| Schema definition     | Plain `schema.sql` (DDL)                   | Matches `docs/spec.md`'s project structure (`database/schema.sql`). Portable, reviewable, and can be mounted straight into the official `postgres` Docker image's init directory. |
+| Seed data             | Plain `seed.sql` (INSERT statements)       | Matches `docs/spec.md`'s project structure (`database/seed.sql`). Real relational demo records (not static JSON), with fixed/readable UUID literals so rows are easy to reference by hand while testing. |
+| Config                | `.env` (git-ignored) + `config.js`         | Standard `PGHOST`/`PGPORT`/`PGUSER`/`PGPASSWORD`/`PGDATABASE` env vars, so every teammate points at their own local Postgres install without touching code, and feature/backend can reuse the exact same env vars for its own connection pool/`DATABASE_URL`. |
+| Primary keys          | `UUID DEFAULT gen_random_uuid()`           | Matches every `docs/modules/*.md` field table (`id: UUID`). Built into PostgreSQL core since v13 - no `pgcrypto`/`uuid-ossp` extension needed. |
 
 ## Requirements
 
 - **PostgreSQL installed and running locally.** Download from
   https://www.postgresql.org/download/ (Windows installer includes
-  pgAdmin). Any recent version (13+) works.
-- Node.js v18+ (only needed to run the scripts in this folder - the
-  `pg` package is pure JS, no native build tools required).
+  pgAdmin). Verified against PostgreSQL 18; anything 13+ works
+  (needed for built-in `gen_random_uuid()`).
+- Node.js v18+ (only needed to run the setup scripts in this folder -
+  `pg` is pure JS, no native build tools required).
 
 ## Setup
 
@@ -34,19 +45,23 @@ against a local PostgreSQL server.
    npm install
    ```
 3. Copy `.env.example` to `.env` and fill in your local Postgres
-   credentials (the defaults assume user `postgres` / password
-   `postgres` on `localhost:5432`, adjust to match what you set during
-   install):
+   credentials:
    ```bash
    cp .env.example .env
    ```
 4. Run the setup scripts:
    ```bash
    npm run migrate   # creates the "peoplepay360" database (if missing) and applies schema.sql
-   npm run seed       # inserts demo data (run after migrate)
-   npm run reset       # re-applies schema.sql (which drops+recreates everything) + seed in one step
+   npm run seed       # applies seed.sql (run after migrate)
+   npm run reset       # migrate + seed in one step (safe to re-run any time)
    npm run verify      # prints row counts and checks key business rules
    ```
+
+`schema.sql` and `seed.sql` are also plain SQL files, so they can be
+run directly with `psql -f schema.sql` / `psql -f seed.sql`, or dropped
+into the official `postgres` Docker image's
+`/docker-entrypoint-initdb.d/` directory for `docker compose up` to
+apply automatically on first container start (per NFR-06).
 
 `.env` is git-ignored - every developer/teammate keeps their own local
 credentials there; only `.env.example` (a template with no real
@@ -54,47 +69,55 @@ secrets) is committed.
 
 ## What's in the schema
 
-See [`schema.sql`](./schema.sql) for full DDL and inline comments.
-Tables, grouped by module:
+See [`schema.sql`](./schema.sql) for full DDL and inline comments, and
+[`seed.sql`](./seed.sql) for the demo data. Tables, grouped by module:
 
-- **RBAC**: `roles`, `users`
-- **Org structure**: `departments`, `job_positions`
-- **Scheduling**: `working_schedules`, `working_schedule_lines`
-- **People**: `employees`
+- **Auth**: `users` (role stored directly as an enum column, embedded
+  in the JWT payload per `docs/spec.md`)
+- **People**: `employees` (department/job_position are plain text
+  columns, not foreign keys - see `docs/modules/employee.md`)
+- **Scheduling**: `working_schedules`, `schedule_lines`
 - **Contracts**: `contracts` (historical, period-aware; a trigger
-  prevents two overlapping `running` contracts for the same employee)
+  prevents two overlapping `active` contracts for the same employee)
 - **Attendance**: `attendance`
-- **Time off**: `time_off_types`, `leave_allocations`, `time_off_requests`
+- **Time off**: `time_off_types`, `allocations`, `time_off_requests`
 - **Payroll configuration**: `salary_structures`, `salary_rules`
-- **Payroll processing**: `payruns`, `payrun_employees`, `payslips`,
-  `payslip_lines`, `payroll_warnings`
+- **Payroll processing**: `payruns`, `payrun_employees` (not in the
+  ERD but needed to persist the payrun wizard's employee-selection
+  step), `payslips` (warnings stored as a `warnings JSONB` column, per
+  `docs/modules/payroll.md` - no separate warnings table), `payslip_lines`
 
 Key business rules enforced at the database layer:
 
 - **Contract resolution window**: payroll must pick the contract where
-  `start_date <= period_end AND (end_date IS NULL OR end_date >= period_start)`,
+  `date_start <= period_start AND (date_end >= period_end OR date_end IS NULL) AND status = 'active'`,
   never just "the employee's latest contract." Demonstrated by the
-  seed data for `EMP-002` (Rahul Sharma), who has two contracts; see
-  `verify.js` for the exact query.
-- **No overlapping active contracts**: enforced by the
-  `trg_contracts_no_overlap` trigger (backed by the
-  `prevent_overlapping_running_contracts()` PL/pgSQL function).
+  seed data for Rahul Sharma, who has two contracts; see `verify.js`
+  for the exact query.
+- **Only one active contract per employee**: enforced by the
+  `trg_contracts_no_overlap` trigger (backed by
+  `prevent_overlapping_active_contracts()`).
 - **No duplicate payslips per payrun**: `UNIQUE (payrun_id, employee_id)`
   on `payslips`.
-- **Leave balance**: `remaining = allocated_amount - taken_amount`,
-  demonstrated end-to-end (allocate 20 -> approve a 3-day request ->
-  17 remaining) in the seed data.
+- **Leave balance**: `allocations.remaining` is a generated column
+  (`number_of_days - taken`), always consistent with no application
+  bookkeeping required. Demonstrated end-to-end (allocate 20 -> approve
+  a 3-day request -> 17 remaining) in the seed data.
 
 ## For feature/backend (Avanti)
 
 - Reuse the same `PGHOST`/`PGPORT`/`PGUSER`/`PGPASSWORD`/`PGDATABASE`
-  env vars (see `.env.example`) for your API layer's own connection
-  pool (`pg.Pool`) - no need to duplicate connection logic.
+  env vars (see `.env.example`) for SQLAlchemy's connection string -
+  no need to duplicate connection config.
 - Run `npm run reset` any time you want a clean, known-good dataset.
-- All computed/derived payroll values in the seed data (gross,
-  deductions, net) were hand-checked against the salary rule
-  definitions in `salary_rules` so you can sanity-check your own
-  salary-rule execution engine against them.
+- Seed users have placeholder `password_hash` values
+  (`DEMO_HASH_CHANGE_ME`) - replace with real bcrypt hashes before
+  wiring up login (NFR-03).
+- All computed/derived payroll values in the seed data (gross, net,
+  payslip lines) were hand-checked against the salary rule definitions
+  in `salary_rules` so you can sanity-check your own salary-rule
+  execution engine (`docs/architecture.md`'s evaluation loop) against
+  them.
 
 ## For feature/frontend (Vyshnavi)
 

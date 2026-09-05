@@ -87,16 +87,21 @@ This file lives on `main`. Update it every time you reach a meaningful commit po
 
 | Module                  | Database         | Backend          | Frontend         |
 |-------------------------|------------------|------------------|------------------|
-| Employee Management     | ⬜ Not started   | ⬜ Not started   | ✅ Done          |
-| Contract Management     | ⬜ Not started   | ⬜ Not started   | ✅ Done          |
-| Working Schedules       | ⬜ Not started   | ⬜ Not started   | ✅ Done          |
-| Attendance              | ⬜ Not started   | ⬜ Not started   | ✅ Done          |
-| Time Off                | ⬜ Not started   | ⬜ Not started   | ✅ Done          |
-| Salary Structures/Rules | ⬜ Not started   | ⬜ Not started   | ✅ Done          |
-| Payrun Processing       | ⬜ Not started   | ⬜ Not started   | ✅ Done          |
-| Payslip Generation      | ⬜ Not started   | ⬜ Not started   | ✅ Done          |
+| Employee Management     | ✅ Done          | ⬜ Not started   | ✅ Done          |
+| Contract Management     | ✅ Done          | ⬜ Not started   | ✅ Done          |
+| Working Schedules       | ✅ Done          | ⬜ Not started   | ✅ Done          |
+| Attendance              | ✅ Done          | ⬜ Not started   | ✅ Done          |
+| Time Off                | ✅ Done          | ⬜ Not started   | ✅ Done          |
+| Salary Structures/Rules | ✅ Done          | ⬜ Not started   | ✅ Done          |
+| Payrun Processing       | ✅ Done          | ⬜ Not started   | ✅ Done          |
+| Payslip Generation      | ✅ Done          | ⬜ Not started   | ✅ Done          |
 | Payroll Dashboard       | ⬜ Not started   | ⬜ Not started   | ✅ Done          |
-| Auth / RBAC             | ⬜ Not started   | ⬜ Not started   | ✅ Done          |
+| Auth / RBAC             | ✅ Done          | ⬜ Not started   | ✅ Done          |
+
+Database detail: schema.sql + seed.sql cover every module above except
+Payroll Dashboard (no dedicated tables - it queries existing data).
+Verified end-to-end against a local PostgreSQL 18 install (`npm run
+reset && npm run verify` in `database/`). See `database/README.md`.
 
 Status key: ⬜ Not started | 🔄 In progress | ✅ Done | 🔀 Merged to main
 
@@ -106,7 +111,8 @@ Status key: ⬜ Not started | 🔄 In progress | ✅ Done | 🔀 Merged to main
 
 | Date | Branch | Merged by | What was merged |
 |------|--------|-----------|-----------------|
-|      |        |           |                 |
+| (prior to 2026-09-05) | `feature/database` | (unrecorded) | Initial schema + seed data merge into `main` |
+| 2026-09-05 | `feature/database` | Maddi Soumya | Schema/seed rewritten to match this file's Naming Conventions + `docs/modules/*.md` exactly (UUID ids, `employees.name`, `date_start`/`date_end`, `allocations`, `schedule_lines`, etc.) - not yet re-merged into `main`, see note below |
 
 ---
 
@@ -116,6 +122,7 @@ Status key: ⬜ Not started | 🔄 In progress | ✅ Done | 🔀 Merged to main
 |---|-----------|---------------------------------|--------|
 | 1 |           | PDF library choice (TBD)        | Open   |
 | 2 |           | Email service choice (TBD)      | Open   |
+| 3 | Maddi Soumya | `main`'s `database/` folder is now stale - it still has the pre-naming-convention schema (BIGINT ids, `first_name`/`last_name`, `departments`/`job_positions` tables, `start_date`/`end_date`, etc.). The corrected version matching this file lives on `feature/database` (commit `d224b32` at time of writing) but hasn't been re-merged into `main` yet. | Open |
 
 ---
 
