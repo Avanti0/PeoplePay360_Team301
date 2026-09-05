@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { api } from '../../services/api';
 import { TimeOffRequest, Allocation, TimeOffType, Employee } from '../../types';
 import { useAuth } from '../../context/AuthContext';
@@ -10,8 +11,22 @@ import { CalendarCheck, Plus, Check, X, Layers, PieChart } from 'lucide-react';
 export const TimeOffPage: React.FC = () => {
   const { hasRole } = useAuth();
   const { success, error, warning } = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  const [activeTab, setActiveTab] = useState<'requests' | 'allocations' | 'types'>('requests');
+  const tabParam = searchParams.get('tab');
+  const initialTab = (tabParam === 'allocations' || tabParam === 'types') ? tabParam : 'requests';
+  const [activeTab, setActiveTab] = useState<'requests' | 'allocations' | 'types'>(initialTab);
+
+  useEffect(() => {
+    if (tabParam === 'requests' || tabParam === 'allocations' || tabParam === 'types') {
+      setActiveTab(tabParam);
+    }
+  }, [tabParam]);
+
+  const handleTabChange = (tab: 'requests' | 'allocations' | 'types') => {
+    setActiveTab(tab);
+    setSearchParams({ tab });
+  };
   const [requests, setRequests] = useState<TimeOffRequest[]>([]);
   const [allocations, setAllocations] = useState<Allocation[]>([]);
   const [leaveTypes, setLeaveTypes] = useState<TimeOffType[]>([]);
@@ -165,7 +180,7 @@ export const TimeOffPage: React.FC = () => {
 
       <div className="flex items-center gap-2 border-b border-slate-200 text-xs font-bold">
         <button
-          onClick={() => setActiveTab('requests')}
+          onClick={() => handleTabChange('requests')}
           className={`pb-3 px-4 flex items-center gap-2 border-b-2 transition-all ${
             activeTab === 'requests' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-800'
           }`}
@@ -174,7 +189,7 @@ export const TimeOffPage: React.FC = () => {
           <span>Requests ({requests.length})</span>
         </button>
         <button
-          onClick={() => setActiveTab('allocations')}
+          onClick={() => handleTabChange('allocations')}
           className={`pb-3 px-4 flex items-center gap-2 border-b-2 transition-all ${
             activeTab === 'allocations' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-800'
           }`}
@@ -183,7 +198,7 @@ export const TimeOffPage: React.FC = () => {
           <span>Balance Allocations ({allocations.length})</span>
         </button>
         <button
-          onClick={() => setActiveTab('types')}
+          onClick={() => handleTabChange('types')}
           className={`pb-3 px-4 flex items-center gap-2 border-b-2 transition-all ${
             activeTab === 'types' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-800'
           }`}

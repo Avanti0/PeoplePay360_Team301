@@ -108,8 +108,12 @@ Models + CRUD/RBAC routers exist for:
 - Time Off
 
 The Time Off module includes the leave-approval → balance-deduction flow and matches the real `feature/database` `schema.sql`.
-
 Backend modules are marked **In Progress** rather than **Done** because they have not yet been fully smoke-tested against a live PostgreSQL instance.
+
+| Date | Branch | Merged by | What was merged |
+|------|--------|-----------|-----------------|
+| 2026-09-05 | `feature/frontend` | T. Lakshmi Vyshnavi | App Shell (Sidebar with 5 grouped navigation sections, Topbar with responsive search/notifications/breadcrumbs, UserMenu with profile/role switcher) |
+| 2026-09-05 | `feature/database` | Maddi Soumya | Schema/seed rewritten to match this file's Naming Conventions + `docs/modules/*.md` exactly (UUID ids, `employees.name`, `date_start`/`date_end`, `allocations`, `schedule_lines`, etc.) - not yet re-merged into `main`, see note below |
 
 Salary Structures/Rules and the Payrun engine are next.
 
