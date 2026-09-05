@@ -6,6 +6,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { StatusBadge } from '../../components/common/StatusBadge';
 import { Modal } from '../../components/common/Modal';
+import { validateRequired, validateDateRange } from '../../utils/validation';
 import {
   Calculator,
   Plus,
@@ -26,15 +27,17 @@ export const PayrunsPage: React.FC = () => {
   const [structures, setStructures] = useState<SalaryStructure[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   // Two-Step Wizard Modal State (FR-09)
   const [isWizardOpen, setIsWizardOpen] = useState(false);
   const [wizardStep, setWizardStep] = useState<1 | 2>(1);
   const [payrunName, setPayrunName] = useState('October 2026 Monthly Payrun');
-  const [selectedStructureId, setSelectedStructureId] = useState<string>('1');
+  const [selectedStructureId, setSelectedStructureId] = useState<string>('');
   const [periodStart, setPeriodStart] = useState('2026-10-01');
   const [periodEnd, setPeriodEnd] = useState('2026-10-31');
-  const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<number[]>([]);
+  const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<string[]>([]);
 
   useEffect(() => {
     loadPayruns();
@@ -51,9 +54,12 @@ export const PayrunsPage: React.FC = () => {
       setPayruns(pList);
       setStructures(sList);
       setEmployees(eList);
+      if (sList.length > 0 && !selectedStructureId) {
+        setSelectedStructureId(sList[0].id);
+      }
       // Default all active employees in step 2
       setSelectedEmployeeIds(
-        eList.filter((e) => e.employmentStatus === 'active').map((e) => Number(e.id))
+        eList.filter((e) => e.employmentStatus === 'active').map((e) => String(e.id))
       );
     } catch {
       error('Failed to load payruns');
@@ -75,14 +81,39 @@ export const PayrunsPage: React.FC = () => {
     if (selectedEmployeeIds.length === employees.length) {
       setSelectedEmployeeIds([]);
     } else {
-      setSelectedEmployeeIds(employees.map((e) => Number(e.id)));
+      setSelectedEmployeeIds(employees.map((e) => String(e.id)));
     }
   };
 
-  const toggleEmployeeSelection = (id: number) => {
+  const toggleEmployeeSelection = (id: string) => {
     setSelectedEmployeeIds((prev) =>
       prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
     );
+  };
+
+  const validateStep1 = (): boolean => {
+    const errors: Record<string, string> = {};
+
+    const nameErr = validateRequired(payrunName, 'Payrun name');
+    if (nameErr) errors.payrunName = nameErr;
+
+    if (!selectedStructureId) {
+      errors.selectedStructureId = 'Please select a salary structure';
+    }
+
+    const rangeErr = validateDateRange(periodStart, periodEnd, 'Payroll Period');
+    if (rangeErr) {
+      errors.periodEnd = rangeErr;
+    }
+
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const handleProceedToStep2 = () => {
+    if (validateStep1()) {
+      setWizardStep(2);
+    }
   };
 
   const handleCreatePayrun = async () => {
@@ -91,9 +122,10 @@ export const PayrunsPage: React.FC = () => {
       return;
     }
 
+    setIsSubmitting(true);
     try {
       const created = await api.payruns.create({
-        name: payrunName,
+        name: payrunName.trim(),
         salaryStructureId: selectedStructureId,
         periodStart,
         periodEnd,
@@ -103,10 +135,13 @@ export const PayrunsPage: React.FC = () => {
       success(`Payrun "${created.name}" created as draft. Proceed to compute payslips.`);
       setIsWizardOpen(false);
       setWizardStep(1);
+      setFormErrors({});
       loadPayruns();
       navigate(`/payruns/${created.id}`);
-    } catch {
-      error('Error launching payrun wizard');
+    } catch (err: any) {
+      error(err.message || 'Error launching payrun wizard');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -254,25 +289,42 @@ export const PayrunsPage: React.FC = () => {
                 <input
                   type="text"
                   value={payrunName}
-                  onChange={(e) => setPayrunName(e.target.value)}
-                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
+                  onChange={(e) => {
+                    setPayrunName(e.target.value);
+                    if (formErrors.payrunName) setFormErrors({ ...formErrors, payrunName: '' });
+                  }}
+                  className={`w-full px-3 py-2 text-xs rounded-xl border ${
+                    formErrors.payrunName ? 'border-rose-400 bg-rose-50/20' : 'border-slate-300'
+                  } focus:ring-2 focus:ring-blue-500 outline-none`}
                   required
                 />
+                {formErrors.payrunName && (
+                  <p className="text-[11px] text-rose-500 mt-1 font-medium">{formErrors.payrunName}</p>
+                )}
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">Salary Structure</label>
                 <select
                   value={selectedStructureId}
-                  onChange={(e) => setSelectedStructureId(e.target.value)}
-                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
+                  onChange={(e) => {
+                    setSelectedStructureId(e.target.value);
+                    if (formErrors.selectedStructureId) setFormErrors({ ...formErrors, selectedStructureId: '' });
+                  }}
+                  className={`w-full px-3 py-2 text-xs rounded-xl border ${
+                    formErrors.selectedStructureId ? 'border-rose-400 bg-rose-50/20' : 'border-slate-300'
+                  } focus:ring-2 focus:ring-blue-500 outline-none`}
                 >
+                  <option value="">Select Salary Structure</option>
                   {structures.map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.name}
                     </option>
                   ))}
                 </select>
+                {formErrors.selectedStructureId && (
+                  <p className="text-[11px] text-rose-500 mt-1 font-medium">{formErrors.selectedStructureId}</p>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -281,7 +333,10 @@ export const PayrunsPage: React.FC = () => {
                   <input
                     type="date"
                     value={periodStart}
-                    onChange={(e) => setPeriodStart(e.target.value)}
+                    onChange={(e) => {
+                      setPeriodStart(e.target.value);
+                      if (formErrors.periodEnd) setFormErrors({ ...formErrors, periodEnd: '' });
+                    }}
                     className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
                     required
                   />
@@ -291,12 +346,20 @@ export const PayrunsPage: React.FC = () => {
                   <input
                     type="date"
                     value={periodEnd}
-                    onChange={(e) => setPeriodEnd(e.target.value)}
-                    className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
+                    onChange={(e) => {
+                      setPeriodEnd(e.target.value);
+                      if (formErrors.periodEnd) setFormErrors({ ...formErrors, periodEnd: '' });
+                    }}
+                    className={`w-full px-3 py-2 text-xs rounded-xl border ${
+                      formErrors.periodEnd ? 'border-rose-400 bg-rose-50/20' : 'border-slate-300'
+                    } focus:ring-2 focus:ring-blue-500 outline-none`}
                     required
                   />
                 </div>
               </div>
+              {formErrors.periodEnd && (
+                <p className="text-[11px] text-rose-500 mt-1 font-medium">{formErrors.periodEnd}</p>
+              )}
 
               <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
                 <button
@@ -308,7 +371,7 @@ export const PayrunsPage: React.FC = () => {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setWizardStep(2)}
+                  onClick={handleProceedToStep2}
                   className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-1.5"
                 >
                   <span>Continue to Step 2</span>
@@ -337,11 +400,11 @@ export const PayrunsPage: React.FC = () => {
 
               <div className="max-h-64 overflow-y-auto divide-y divide-slate-100 border border-slate-200 rounded-xl">
                 {employees.map((emp) => {
-                  const isChecked = selectedEmployeeIds.includes(Number(emp.id));
+                  const isChecked = selectedEmployeeIds.includes(String(emp.id));
                   return (
                     <div
                       key={emp.id}
-                      onClick={() => toggleEmployeeSelection(Number(emp.id))}
+                      onClick={() => toggleEmployeeSelection(String(emp.id))}
                       className={`p-2.5 flex items-center justify-between cursor-pointer text-xs transition-colors ${
                         isChecked ? 'bg-blue-50/50' : 'hover:bg-slate-50'
                       }`}
@@ -392,9 +455,10 @@ export const PayrunsPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={handleCreatePayrun}
-                    className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-sm"
+                    disabled={isSubmitting || selectedEmployeeIds.length === 0}
+                    className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-sm disabled:opacity-50"
                   >
-                    Create Payrun (Draft)
+                    {isSubmitting ? 'Creating...' : 'Create Payrun (Draft)'}
                   </button>
                 </div>
               </div>

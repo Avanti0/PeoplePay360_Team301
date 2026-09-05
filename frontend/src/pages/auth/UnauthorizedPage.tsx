@@ -6,9 +6,7 @@ import {
   ShieldAlert,
   ArrowLeft,
   LayoutDashboard,
-  UserCheck,
   Lock,
-  ChevronRight,
 } from 'lucide-react';
 
 interface UnauthorizedPageProps {
@@ -16,7 +14,7 @@ interface UnauthorizedPageProps {
 }
 
 export const UnauthorizedPage: React.FC<UnauthorizedPageProps> = ({ requiredRole }) => {
-  const { user, role, switchUserRole } = useAuth();
+  const { role } = useAuth();
   const navigate = useNavigate();
 
   const roleLabels: Record<RoleName, string> = {
@@ -32,12 +30,6 @@ export const UnauthorizedPage: React.FC<UnauthorizedPageProps> = ({ requiredRole
     : requiredRole
     ? roleLabels[requiredRole] || requiredRole
     : 'Elevated Corporate Permissions';
-
-  const availableRoles: { id: RoleName; label: string; desc: string }[] = [
-    { id: 'admin', label: 'Admin', desc: 'Full unrestricted access to all modules' },
-    { id: 'hr_payroll_manager', label: 'HR Payroll Manager', desc: 'Payroll, structures, and payrun authority' },
-    { id: 'hr_manager', label: 'HR Manager', desc: 'Employee, contract, and leave management' },
-  ];
 
   return (
     <div className="min-h-[80vh] flex items-center justify-center p-6 select-none font-sans">
@@ -77,36 +69,6 @@ export const UnauthorizedPage: React.FC<UnauthorizedPageProps> = ({ requiredRole
             <span className="font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-md">
               {allowedRolesDisplay}
             </span>
-          </div>
-        </div>
-
-        {/* Quick Switch Persona for Demo / Evaluation */}
-        <div className="mb-6 text-left">
-          <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">
-            Switch to an Authorized Persona:
-          </p>
-          <div className="space-y-1.5">
-            {availableRoles.map((r) => (
-              <button
-                key={r.id}
-                onClick={() => {
-                  switchUserRole(r.id);
-                  navigate('/dashboard');
-                }}
-                className="w-full p-2.5 rounded-xl border border-slate-200 hover:border-blue-400 hover:bg-blue-50/50 flex items-center justify-between text-left transition-all group"
-              >
-                <div className="flex items-center gap-2.5">
-                  <div className="w-7 h-7 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs group-hover:bg-blue-600 group-hover:text-white transition-colors">
-                    <UserCheck className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-slate-800">{r.label}</p>
-                    <p className="text-[10px] text-slate-400">{r.desc}</p>
-                  </div>
-                </div>
-                <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-blue-600 transition-colors" />
-              </button>
-            ))}
           </div>
         </div>
 

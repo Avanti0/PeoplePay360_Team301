@@ -1,7 +1,7 @@
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
-from app.models.working_schedule import WorkingSchedule, WorkingScheduleLine
+from app.models.working_schedule import WorkingSchedule, ScheduleLine
 from app.schemas.working_schedule import WorkingScheduleCreate, WorkingScheduleUpdate
 
 
@@ -31,11 +31,11 @@ def get_schedule(db: Session, schedule_id: int):
 
 
 def create_schedule(db: Session, data: WorkingScheduleCreate):
-    obj = WorkingSchedule(name=data.name, schedule_type=data.schedule_type)
+    obj = WorkingSchedule(name=data.name)
     db.add(obj)
     db.flush()
     for line in data.lines:
-        db.add(WorkingScheduleLine(schedule_id=obj.id, **line.model_dump()))
+        db.add(ScheduleLine(schedule_id=obj.id, **line.model_dump()))
     try:
         db.commit()
     except IntegrityError:
@@ -58,7 +58,7 @@ def update_schedule(db: Session, schedule_id: int, data: WorkingScheduleUpdate):
             db.delete(line)
         db.flush()
         for line in data.lines:
-            db.add(WorkingScheduleLine(schedule_id=obj.id, **line.model_dump()))
+            db.add(ScheduleLine(schedule_id=obj.id, **line.model_dump()))
 
     try:
         db.commit()

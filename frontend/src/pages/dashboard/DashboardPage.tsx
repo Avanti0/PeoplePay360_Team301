@@ -33,9 +33,16 @@ export const DashboardPage: React.FC = () => {
   const [alerts, setAlerts] = useState<DashboardAlert[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  const isManagement =
+    hasRole('hr_manager') ||
+    hasRole('hr_payroll_user') ||
+    hasRole('hr_payroll_manager') ||
+    hasRole('admin') ||
+    (user && user.role !== 'employee');
+
   useEffect(() => {
     loadDashboardData();
-  }, []);
+  }, [user]);
 
   const loadDashboardData = async () => {
     setIsLoading(true);

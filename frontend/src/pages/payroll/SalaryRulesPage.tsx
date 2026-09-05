@@ -6,6 +6,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { Modal } from '../../components/common/Modal';
 import { Button } from '../../components/common/Button';
+import { validateRequired, validateSalaryRuleCode, validatePositiveNumber } from '../../utils/validation';
 import {
   Sliders,
   Plus,
@@ -26,10 +27,12 @@ export const SalaryRulesPage: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   // New Rule Modal
   const [isRuleModalOpen, setIsRuleModalOpen] = useState(false);
-  const [ruleStructureId, setRuleStructureId] = useState<string>('1');
+  const [ruleStructureId, setRuleStructureId] = useState<string>('');
   const [ruleName, setRuleName] = useState('');
   const [ruleCode, setRuleCode] = useState('');
   const [ruleCategory, setRuleCategory] = useState<any>('allowance');
@@ -53,6 +56,9 @@ export const SalaryRulesPage: React.FC = () => {
       ]);
       setStructures(structData);
       setRules(ruleData);
+      if (structData.length > 0 && !ruleStructureId) {
+        setRuleStructureId(structData[0].id);
+      }
     } catch {
       error('Failed to load salary rules');
     } finally {
@@ -70,20 +76,58 @@ export const SalaryRulesPage: React.FC = () => {
     return matchesStruct && matchesCat && matchesSearch;
   });
 
+  const validateRuleForm = (): boolean => {
+    const errors: Record<string, string> = {};
+
+    const nameErr = validateRequired(ruleName, 'Rule name');
+    if (nameErr) errors.ruleName = nameErr;
+
+    const codeErr = validateSalaryRuleCode(ruleCode);
+    if (codeErr) errors.ruleCode = codeErr;
+
+    if (!ruleStructureId) {
+      errors.ruleStructureId = 'Please select a salary structure';
+    }
+
+    if (!ruleSequence || ruleSequence < 1) {
+      errors.ruleSequence = 'Sequence must be a positive integer (e.g. 10, 20)';
+    }
+
+    if (ruleCompType === 'fixed') {
+      const amtErr = validatePositiveNumber(ruleAmount, 'Fixed amount');
+      if (amtErr) errors.ruleAmount = amtErr;
+    } else if (ruleCompType === 'percentage') {
+      if (rulePercent < 0 || rulePercent > 1000) {
+        errors.rulePercent = 'Percentage must be between 0 and 1000%';
+      }
+      const baseErr = validateRequired(rulePercentBase, 'Base rule code');
+      if (baseErr) errors.rulePercentBase = baseErr;
+    } else if (ruleCompType === 'formula') {
+      const formErr = validateRequired(ruleFormula, 'Formula expression');
+      if (formErr) errors.ruleFormula = formErr;
+    }
+
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   const handleCreateRule = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!validateRuleForm()) return;
+
+    setIsSubmitting(true);
     try {
       const created = await api.salaryRules.create({
         salaryStructureId: ruleStructureId,
-        name: ruleName,
-        code: ruleCode.toUpperCase(),
+        name: ruleName.trim(),
+        code: ruleCode.trim().toUpperCase(),
         category: ruleCategory,
-        sequence: ruleSequence,
+        sequence: Number(ruleSequence),
         computationType: ruleCompType,
-        amount: ruleCompType === 'fixed' ? ruleAmount : null,
-        percentageBase: ruleCompType === 'percentage' ? rulePercentBase : null,
-        percentage: ruleCompType === 'percentage' ? rulePercent : null,
-        formula: ruleCompType === 'formula' ? ruleFormula : null,
+        amount: ruleCompType === 'fixed' ? Number(ruleAmount) : null,
+        percentageBase: ruleCompType === 'percentage' ? rulePercentBase.trim().toUpperCase() : null,
+        percentage: ruleCompType === 'percentage' ? Number(rulePercent) : null,
+        formula: ruleCompType === 'formula' ? ruleFormula.trim() : null,
         isActive: true,
       });
 
@@ -91,9 +135,12 @@ export const SalaryRulesPage: React.FC = () => {
       setIsRuleModalOpen(false);
       setRuleName('');
       setRuleCode('');
+      setFormErrors({});
       loadData();
-    } catch {
-      error('Error creating salary rule');
+    } catch (err: any) {
+      error(err.message || 'Error creating salary rule');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -255,15 +302,24 @@ export const SalaryRulesPage: React.FC = () => {
             <label className="block text-xs font-bold text-slate-700 mb-1">Target Structure</label>
             <select
               value={ruleStructureId}
-              onChange={(e) => setRuleStructureId(e.target.value)}
-              className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
+              onChange={(e) => {
+                setRuleStructureId(e.target.value);
+                if (formErrors.ruleStructureId) setFormErrors({ ...formErrors, ruleStructureId: '' });
+              }}
+              className={`w-full px-3 py-2 text-xs rounded-xl border ${
+                formErrors.ruleStructureId ? 'border-rose-400 bg-rose-50/20' : 'border-slate-300'
+              } focus:ring-2 focus:ring-blue-500 outline-none`}
             >
+              <option value="">Select Structure</option>
               {structures.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.name}
                 </option>
               ))}
             </select>
+            {formErrors.ruleStructureId && (
+              <p className="text-[11px] text-rose-500 mt-1 font-medium">{formErrors.ruleStructureId}</p>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -272,22 +328,38 @@ export const SalaryRulesPage: React.FC = () => {
               <input
                 type="text"
                 value={ruleName}
-                onChange={(e) => setRuleName(e.target.value)}
+                onChange={(e) => {
+                  setRuleName(e.target.value);
+                  if (formErrors.ruleName) setFormErrors({ ...formErrors, ruleName: '' });
+                }}
                 placeholder="e.g. Provident Fund Deduction"
-                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
+                className={`w-full px-3 py-2 text-xs rounded-xl border ${
+                  formErrors.ruleName ? 'border-rose-400 bg-rose-50/20' : 'border-slate-300'
+                } focus:ring-2 focus:ring-blue-500 outline-none`}
                 required
               />
+              {formErrors.ruleName && (
+                <p className="text-[11px] text-rose-500 mt-1 font-medium">{formErrors.ruleName}</p>
+              )}
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">Rule Code</label>
               <input
                 type="text"
                 value={ruleCode}
-                onChange={(e) => setRuleCode(e.target.value)}
+                onChange={(e) => {
+                  setRuleCode(e.target.value);
+                  if (formErrors.ruleCode) setFormErrors({ ...formErrors, ruleCode: '' });
+                }}
                 placeholder="e.g. PF_DED"
-                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none uppercase font-mono"
+                className={`w-full px-3 py-2 text-xs rounded-xl border ${
+                  formErrors.ruleCode ? 'border-rose-400 bg-rose-50/20' : 'border-slate-300'
+                } focus:ring-2 focus:ring-blue-500 outline-none uppercase font-mono`}
                 required
               />
+              {formErrors.ruleCode && (
+                <p className="text-[11px] text-rose-500 mt-1 font-medium">{formErrors.ruleCode}</p>
+              )}
             </div>
           </div>
 
@@ -310,11 +382,21 @@ export const SalaryRulesPage: React.FC = () => {
               <label className="block text-xs font-bold text-slate-700 mb-1">Sequence</label>
               <input
                 type="number"
+                min="1"
+                step="1"
                 value={ruleSequence}
-                onChange={(e) => setRuleSequence(Number(e.target.value))}
-                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
+                onChange={(e) => {
+                  setRuleSequence(Number(e.target.value));
+                  if (formErrors.ruleSequence) setFormErrors({ ...formErrors, ruleSequence: '' });
+                }}
+                className={`w-full px-3 py-2 text-xs rounded-xl border ${
+                  formErrors.ruleSequence ? 'border-rose-400 bg-rose-50/20' : 'border-slate-300'
+                } focus:ring-2 focus:ring-blue-500 outline-none`}
                 required
               />
+              {formErrors.ruleSequence && (
+                <p className="text-[11px] text-rose-500 mt-1 font-medium">{formErrors.ruleSequence}</p>
+              )}
             </div>
           </div>
 
@@ -336,11 +418,21 @@ export const SalaryRulesPage: React.FC = () => {
               <label className="block text-xs font-bold text-slate-700 mb-1">Amount (₹)</label>
               <input
                 type="number"
+                min="0"
+                step="0.01"
                 value={ruleAmount}
-                onChange={(e) => setRuleAmount(Number(e.target.value))}
-                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
+                onChange={(e) => {
+                  setRuleAmount(Number(e.target.value));
+                  if (formErrors.ruleAmount) setFormErrors({ ...formErrors, ruleAmount: '' });
+                }}
+                className={`w-full px-3 py-2 text-xs rounded-xl border ${
+                  formErrors.ruleAmount ? 'border-rose-400 bg-rose-50/20' : 'border-slate-300'
+                } focus:ring-2 focus:ring-blue-500 outline-none`}
                 required
               />
+              {formErrors.ruleAmount && (
+                <p className="text-[11px] text-rose-500 mt-1 font-medium">{formErrors.ruleAmount}</p>
+              )}
             </div>
           )}
 
@@ -351,22 +443,40 @@ export const SalaryRulesPage: React.FC = () => {
                 <input
                   type="number"
                   step="0.1"
+                  min="0"
+                  max="1000"
                   value={rulePercent}
-                  onChange={(e) => setRulePercent(Number(e.target.value))}
-                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
+                  onChange={(e) => {
+                    setRulePercent(Number(e.target.value));
+                    if (formErrors.rulePercent) setFormErrors({ ...formErrors, rulePercent: '' });
+                  }}
+                  className={`w-full px-3 py-2 text-xs rounded-xl border ${
+                    formErrors.rulePercent ? 'border-rose-400 bg-rose-50/20' : 'border-slate-300'
+                  } focus:ring-2 focus:ring-blue-500 outline-none`}
                   required
                 />
+                {formErrors.rulePercent && (
+                  <p className="text-[11px] text-rose-500 mt-1 font-medium">{formErrors.rulePercent}</p>
+                )}
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">Base Rule Code</label>
                 <input
                   type="text"
                   value={rulePercentBase}
-                  onChange={(e) => setRulePercentBase(e.target.value)}
+                  onChange={(e) => {
+                    setRulePercentBase(e.target.value);
+                    if (formErrors.rulePercentBase) setFormErrors({ ...formErrors, rulePercentBase: '' });
+                  }}
                   placeholder="e.g. BASIC"
-                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none uppercase font-mono"
+                  className={`w-full px-3 py-2 text-xs rounded-xl border ${
+                    formErrors.rulePercentBase ? 'border-rose-400 bg-rose-50/20' : 'border-slate-300'
+                  } focus:ring-2 focus:ring-blue-500 outline-none uppercase font-mono`}
                   required
                 />
+                {formErrors.rulePercentBase && (
+                  <p className="text-[11px] text-rose-500 mt-1 font-medium">{formErrors.rulePercentBase}</p>
+                )}
               </div>
             </div>
           )}
@@ -377,11 +487,19 @@ export const SalaryRulesPage: React.FC = () => {
               <input
                 type="text"
                 value={ruleFormula}
-                onChange={(e) => setRuleFormula(e.target.value)}
+                onChange={(e) => {
+                  setRuleFormula(e.target.value);
+                  if (formErrors.ruleFormula) setFormErrors({ ...formErrors, ruleFormula: '' });
+                }}
                 placeholder="e.g. BASIC + HRA - PF"
-                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none font-mono"
+                className={`w-full px-3 py-2 text-xs rounded-xl border ${
+                  formErrors.ruleFormula ? 'border-rose-400 bg-rose-50/20' : 'border-slate-300'
+                } focus:ring-2 focus:ring-blue-500 outline-none font-mono`}
                 required
               />
+              {formErrors.ruleFormula && (
+                <p className="text-[11px] text-rose-500 mt-1 font-medium">{formErrors.ruleFormula}</p>
+              )}
             </div>
           )}
 
@@ -395,9 +513,10 @@ export const SalaryRulesPage: React.FC = () => {
             </button>
             <button
               type="submit"
-              className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold"
+              disabled={isSubmitting}
+              className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold disabled:opacity-50"
             >
-              Save Rule
+              {isSubmitting ? 'Saving...' : 'Save Rule'}
             </button>
           </div>
         </form>

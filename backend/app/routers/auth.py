@@ -2,14 +2,28 @@ from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from app.db.session import get_db
+from app.core.dependencies import get_current_user
 from app.models.user import User
 from app.models.employee import Employee
-from app.schemas.auth import TokenOut, UserCreate, UserOut
+from app.schemas.auth import TokenOut, UserCreate, UserOut, UserMeOut, LoginOut
 from app.core.security import verify_password, hash_password, create_access_token, create_refresh_token, decode_token
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
-@router.post("/login", response_model=TokenOut)
+
+def _build_user_me(db: Session, user: User) -> UserMeOut:
+    employee = db.query(Employee).filter(Employee.user_id == user.id).first()
+    return UserMeOut(
+        id=user.id,
+        username=user.username,
+        role=user.role,
+        is_active=user.is_active,
+        employee_id=employee.id if employee else None,
+        employee_name=employee.name if employee else None,
+    )
+
+
+@router.post("/login", response_model=LoginOut)
 def login(response: Response, form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     user = db.query(User).filter(User.username == form.username).first()
     if not user or not verify_password(form.password, user.password_hash):
@@ -17,7 +31,7 @@ def login(response: Response, form: OAuth2PasswordRequestForm = Depends(), db: S
     access_token = create_access_token({"sub": str(user.id), "role": user.role})
     refresh_token = create_refresh_token({"sub": str(user.id), "role": user.role})
     response.set_cookie("refresh_token", refresh_token, httponly=True, max_age=7*24*3600)
-    return {"access_token": access_token}
+    return {"access_token": access_token, "user": _build_user_me(db, user)}
 
 @router.post("/refresh", response_model=TokenOut)
 def refresh(request: Request):
@@ -31,6 +45,10 @@ def refresh(request: Request):
 def logout(response: Response):
     response.delete_cookie("refresh_token")
     return {"detail": "Logged out"}
+
+@router.get("/me", response_model=UserMeOut)
+def me(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    return _build_user_me(db, current_user)
 
 @router.post("/register", response_model=UserOut)
 def register(data: UserCreate, db: Session = Depends(get_db)):

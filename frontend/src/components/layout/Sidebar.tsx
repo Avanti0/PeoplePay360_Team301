@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 import {
   LayoutDashboard,
   Users,
@@ -16,6 +17,7 @@ import {
   Sliders,
   X,
   Sparkles,
+  ShieldCheck,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -41,23 +43,40 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onCloseMobile,
 }) => {
   const location = useLocation();
+  const { hasRole, user } = useAuth();
+  const isAdmin = hasRole('admin') || user?.role === 'admin';
 
-  // Navigation Groups matching Prompt 4
+  const isHrManager =
+    hasRole('hr_manager') ||
+    hasRole('hr_payroll_user') ||
+    hasRole('hr_payroll_manager') ||
+    hasRole('admin');
+
+  const isPayrollUser =
+    hasRole('hr_payroll_user') ||
+    hasRole('hr_payroll_manager') ||
+    hasRole('admin');
+
+  // Navigation Groups matching RBAC permissions
   const navGroups: NavGroup[] = [
     {
       name: 'Dashboard',
       to: '/dashboard',
       icon: LayoutDashboard,
     },
-    {
-      name: 'People',
-      icon: Users,
-      children: [
-        { name: 'Employees', to: '/employees', icon: Users },
-        { name: 'Contracts', to: '/contracts', icon: FileSignature },
-        { name: 'Working Schedules', to: '/working-schedules', icon: CalendarDays },
-      ],
-    },
+    ...(isHrManager
+      ? [
+          {
+            name: 'People',
+            icon: Users,
+            children: [
+              { name: 'Employees', to: '/employees', icon: Users },
+              { name: 'Contracts', to: '/contracts', icon: FileSignature },
+              { name: 'Working Schedules', to: '/working-schedules', icon: CalendarDays },
+            ],
+          },
+        ]
+      : []),
     {
       name: 'Attendance',
       icon: Clock,
@@ -69,8 +88,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       name: 'Time Off',
       icon: CalendarCheck,
       children: [
-        { name: 'Leave Types', to: '/time-off/types', icon: Layers },
-        { name: 'Allocations', to: '/time-off/allocations', icon: PieChart },
+        ...(isHrManager
+          ? [
+              { name: 'Leave Types', to: '/time-off/types', icon: Layers },
+              { name: 'Allocations', to: '/time-off/allocations', icon: PieChart },
+            ]
+          : []),
         { name: 'Requests', to: '/time-off/requests', icon: CalendarCheck },
       ],
     },
@@ -78,12 +101,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
       name: 'Payroll',
       icon: Calculator,
       children: [
-        { name: 'Salary Structures', to: '/salary-structures', icon: Layers },
-        { name: 'Salary Rules', to: '/salary-rules', icon: Sliders },
-        { name: 'Payruns', to: '/payruns', icon: Calculator },
+        ...(isPayrollUser
+          ? [
+              { name: 'Salary Structures', to: '/salary-structures', icon: Layers },
+              { name: 'Salary Rules', to: '/salary-rules', icon: Sliders },
+              { name: 'Payruns', to: '/payruns', icon: Calculator },
+            ]
+          : []),
         { name: 'Payslips', to: '/payslips', icon: Receipt },
       ],
     },
+    ...(isAdmin
+      ? [
+          {
+            name: 'Administration',
+            icon: ShieldCheck,
+            children: [
+              { name: 'User Management', to: '/users', icon: ShieldCheck },
+            ],
+          },
+        ]
+      : []),
   ];
 
   // Track expanded groups (all expanded by default for quick access)
@@ -92,6 +130,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     Attendance: true,
     'Time Off': true,
     Payroll: true,
+    Administration: true,
   });
 
   const toggleGroup = (groupName: string) => {

@@ -2,10 +2,9 @@ from sqlalchemy import func, extract
 from sqlalchemy.orm import Session
 from app.models.employee import Employee
 from app.models.attendance import Attendance
-from app.models.time_off import TimeOffRequest, LeaveAllocation
-from app.models.payroll import Payslip, PayrollWarning, Payrun
+from app.models.time_off import TimeOffRequest
+from app.models.payroll import Payslip, Payrun
 from app.models.contract import Contract
-from app.models.department import Department
 
 
 def get_kpis(db: Session) -> dict:
@@ -32,7 +31,7 @@ def get_kpis(db: Session) -> dict:
         TimeOffRequest.status == "approved"
     ).scalar()
 
-    # Pending leave requests
+    # Pending leave requests (submitted but not yet decided)
     pending_leave = db.query(func.count(TimeOffRequest.id)).filter(
         TimeOffRequest.status == "confirmed"
     ).scalar()
@@ -44,8 +43,8 @@ def get_kpis(db: Session) -> dict:
     ).scalar()
     attendance_health = round((present_att / total_att) * 100, 1)
 
-    # Unresolved warnings (payslips not yet paid)
-    unresolved = db.query(func.count(PayrollWarning.id)).join(Payslip).filter(
+    # Unresolved warnings: non-empty warnings array on any not-yet-paid payslip
+    unresolved = db.query(func.coalesce(func.sum(func.jsonb_array_length(Payslip.warnings)), 0)).filter(
         Payslip.status.notin_(["paid"])
     ).scalar()
 
@@ -57,21 +56,20 @@ def get_kpis(db: Session) -> dict:
         "attendance_health_percentage": attendance_health,
         "active_employees_count": active_employees,
         "pending_leave_requests_count": pending_leave,
-        "unresolved_warnings_count": unresolved,
+        "unresolved_warnings_count": int(unresolved),
     }
 
 
 def get_salary_by_dept(db: Session) -> list[dict]:
     rows = (
         db.query(
-            Department.name.label("department"),
+            Contract.department.label("department"),
             func.coalesce(func.sum(Payslip.net_salary), 0).label("cost"),
             func.count(func.distinct(Payslip.employee_id)).label("employee_count"),
         )
-        .join(Contract, Contract.department_id == Department.id)
         .join(Payslip, Payslip.contract_id == Contract.id)
         .filter(Payslip.status == "paid")
-        .group_by(Department.name)
+        .group_by(Contract.department)
         .order_by(func.sum(Payslip.net_salary).desc())
         .all()
     )
@@ -86,7 +84,6 @@ def get_salary_trend(db: Session) -> list[dict]:
             extract("month", Payrun.period_start).label("month"),
             func.coalesce(func.sum(Payslip.gross_salary), 0).label("gross"),
             func.coalesce(func.sum(Payslip.net_salary), 0).label("net"),
-            func.coalesce(func.sum(Payslip.total_deductions), 0).label("deductions"),
         )
         .join(Payslip, Payslip.payrun_id == Payrun.id)
         .filter(Payrun.status == "paid")
@@ -102,31 +99,33 @@ def get_salary_trend(db: Session) -> list[dict]:
             "month": f"{month_names[int(r.month) - 1]} {int(r.year)}",
             "gross": float(r.gross),
             "net": float(r.net),
-            "deductions": float(r.deductions),
+            "deductions": float(r.gross) - float(r.net),
         }
         for r in rows
     ]
 
 
 def get_alerts(db: Session) -> list[dict]:
-    rows = (
-        db.query(PayrollWarning, Payslip, Employee)
-        .join(Payslip, PayrollWarning.payslip_id == Payslip.id)
+    """Payslip.warnings is a JSONB list of plain message strings (schema.sql
+    dropped the separate payroll_warnings table) — one alert row per string."""
+    payslips = (
+        db.query(Payslip, Employee)
         .join(Employee, Payslip.employee_id == Employee.id)
         .filter(Payslip.status.notin_(["paid"]))
-        .order_by(PayrollWarning.created_at.desc())
+        .filter(func.jsonb_array_length(Payslip.warnings) > 0)
+        .order_by(Payslip.created_at.desc())
         .limit(20)
         .all()
     )
-    return [
-        {
-            "id": w.id,
-            "payslip_id": ps.id,
-            "employee_id": emp.id,
-            "employee_name": f"{emp.first_name} {emp.last_name}",
-            "warning_type": w.warning_type,
-            "message": w.message,
-            "created_at": w.created_at.isoformat() if w.created_at else None,
-        }
-        for w, ps, emp in rows
-    ]
+    alerts = []
+    for ps, emp in payslips:
+        for i, message in enumerate(ps.warnings or []):
+            alerts.append({
+                "id": f"{ps.id}:{i}",
+                "payslip_id": str(ps.id),
+                "employee_id": str(emp.id),
+                "employee_name": emp.name,
+                "warning_type": "payroll_warning",
+                "message": message,
+            })
+    return alerts[:20]

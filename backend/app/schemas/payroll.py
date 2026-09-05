@@ -1,17 +1,19 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional
 from datetime import date, datetime
+from decimal import Decimal
 from enum import Enum
+from uuid import UUID
 
 
 class SalaryRuleCategory(str, Enum):
-    basic      = "basic"
-    allowance  = "allowance"
-    gross      = "gross"
-    deduction  = "deduction"
-    net        = "net"
+    basic     = "basic"
+    allowance = "allowance"
+    gross     = "gross"
+    deduction = "deduction"
+    net       = "net"
 
-class ComputationMethod(str, Enum):
+class ComputationType(str, Enum):
     fixed      = "fixed"
     percentage = "percentage"
     formula    = "formula"
@@ -32,59 +34,59 @@ class PayslipStatus(str, Enum):
 # --- Salary Structure ---
 class SalaryStructureCreate(BaseModel):
     name: str
-    code: str
-    description: Optional[str] = None
+    is_active: bool = True
 
 class SalaryStructureUpdate(BaseModel):
     name: Optional[str] = None
-    description: Optional[str] = None
     is_active: Optional[bool] = None
 
 class SalaryRuleOut(BaseModel):
-    id: int
+    id: UUID
+    salary_structure_id: UUID
     code: str
     name: str
     category: SalaryRuleCategory
     sequence: int
-    computation_method: ComputationMethod
-    amount: Optional[float] = None
-    percentage: Optional[float] = None
-    percentage_of_code: Optional[str] = None
+    computation_type: ComputationType
+    amount: Optional[Decimal] = None
+    percentage: Optional[Decimal] = None
+    percentage_base: Optional[str] = None
     formula: Optional[str] = None
     is_active: bool
-    class Config: from_attributes = True
+
+    model_config = ConfigDict(from_attributes=True)
 
 class SalaryStructureOut(BaseModel):
-    id: int
+    id: UUID
     name: str
-    code: str
-    description: Optional[str] = None
     is_active: bool
+    created_at: datetime
     rules: list[SalaryRuleOut] = []
-    class Config: from_attributes = True
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 # --- Salary Rule ---
 class SalaryRuleCreate(BaseModel):
-    salary_structure_id: int
+    salary_structure_id: UUID
     name: str
     code: str
     category: SalaryRuleCategory
     sequence: int = 10
-    computation_method: ComputationMethod
-    amount: Optional[float] = None
-    percentage: Optional[float] = None
-    percentage_of_code: Optional[str] = None
+    computation_type: ComputationType
+    amount: Optional[Decimal] = None
+    percentage: Optional[Decimal] = None
+    percentage_base: Optional[str] = None
     formula: Optional[str] = None
 
 class SalaryRuleUpdate(BaseModel):
     name: Optional[str] = None
     category: Optional[SalaryRuleCategory] = None
     sequence: Optional[int] = None
-    computation_method: Optional[ComputationMethod] = None
-    amount: Optional[float] = None
-    percentage: Optional[float] = None
-    percentage_of_code: Optional[str] = None
+    computation_type: Optional[ComputationType] = None
+    amount: Optional[Decimal] = None
+    percentage: Optional[Decimal] = None
+    percentage_base: Optional[str] = None
     formula: Optional[str] = None
     is_active: Optional[bool] = None
 
@@ -92,53 +94,48 @@ class SalaryRuleUpdate(BaseModel):
 # --- Payrun ---
 class PayrunCreate(BaseModel):
     name: str
-    salary_structure_id: int
+    salary_structure_id: UUID
     period_start: date
     period_end: date
-    employee_ids: list[int]
+    employee_ids: list[UUID]
 
 class PayrunOut(BaseModel):
-    id: int
+    id: UUID
     name: str
-    salary_structure_id: int
+    salary_structure_id: UUID
     period_start: date
     period_end: date
     status: PayrunStatus
-    computed_at: Optional[datetime] = None
-    validated_at: Optional[datetime] = None
-    paid_at: Optional[datetime] = None
     created_at: datetime
-    class Config: from_attributes = True
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 # --- Payslip ---
 class PayslipLineOut(BaseModel):
-    id: int
+    id: UUID
     code: str
     name: str
     category: SalaryRuleCategory
     sequence: int
-    amount: float
-    class Config: from_attributes = True
+    amount: Decimal
 
-class WarningOut(BaseModel):
-    id: int
-    warning_type: str
-    message: str
-    class Config: from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class PayslipOut(BaseModel):
-    id: int
-    payrun_id: int
-    employee_id: int
-    contract_id: Optional[int] = None
-    worked_days: float
-    gross_salary: float
-    total_deductions: float
-    net_salary: float
+    id: UUID
+    payrun_id: UUID
+    employee_id: UUID
+    contract_id: Optional[UUID] = None
+    period_start: date
+    period_end: date
+    worked_days: Decimal
+    gross_salary: Decimal
+    net_salary: Decimal
     status: PayslipStatus
-    pdf_path: Optional[str] = None
-    emailed_at: Optional[datetime] = None
+    warnings: list[str] = []
     lines: list[PayslipLineOut] = []
-    warnings: list[WarningOut] = []
-    class Config: from_attributes = True
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)

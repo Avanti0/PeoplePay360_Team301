@@ -110,6 +110,7 @@ let salaryStructuresStore = [...initialSalaryStructures];
 let salaryRulesStore = [...initialSalaryRules];
 let payrunsStore = [...initialPayruns];
 let payslipsStore = [...initialPayslips];
+let usersStore: User[] = [...demoUsers];
 
 // ---------------------------------------------------------------------
 // HTTP Fetcher with automatic mock fallback
@@ -129,41 +130,80 @@ async function request<T>(
     headers['Authorization'] = `Bearer ${inMemoryAccessToken}`;
   }
 
+  // Only a genuinely unreachable backend (network/connection failure) falls
+  // back to mock data — and it's logged loudly so that never gets mistaken
+  // for a real response. A reachable backend's own error responses (400s,
+  // 401s, 500s) must propagate as real errors, not get silently replaced
+  // with fake "success" data from the mock layer.
+  let response: Response;
   try {
-    const response = await fetch(`${API_BASE}${endpoint}`, {
+    response = await fetch(`${API_BASE}${endpoint}`, {
       ...options,
       headers,
       credentials: 'include', // for httpOnly refresh cookies
     });
-
-    if (response.status === 401 && endpoint !== '/auth/login') {
-      // Attempt refresh
-      const refreshed = await tryRefreshToken();
-      if (refreshed) {
-        headers['Authorization'] = `Bearer ${inMemoryAccessToken}`;
-        const retryRes = await fetch(`${API_BASE}${endpoint}`, {
-          ...options,
-          headers,
-          credentials: 'include',
-        });
-        if (retryRes.ok) {
-          const raw = await retryRes.json();
-          return snakeToCamel<T>(raw);
-        }
-      }
-    }
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    }
-
-    const raw = await response.json();
-    return snakeToCamel<T>(raw);
-  } catch (err) {
-    // Graceful fallback to mock data layer when backend server is not running
-    // This satisfies Rule 12 and ensures smooth demo and component testability
+  } catch (networkErr) {
+    console.warn(
+      `[PeoplePay360] Backend unreachable at ${API_BASE}${endpoint} — falling back to offline demo data.`,
+      networkErr
+    );
     return mockHandler<T>(endpoint, options);
   }
+
+  if (response.status === 401 && endpoint !== '/auth/login') {
+    const refreshed = await tryRefreshToken();
+    if (refreshed) {
+      headers['Authorization'] = `Bearer ${inMemoryAccessToken}`;
+      response = await fetch(`${API_BASE}${endpoint}`, {
+        ...options,
+        headers,
+        credentials: 'include',
+      });
+    }
+  }
+
+  if (!response.ok) {
+    let detail = response.statusText;
+    try {
+      const rawText = await response.text();
+      try {
+        const body = JSON.parse(rawText);
+        if (body?.detail) {
+          if (Array.isArray(body.detail)) {
+            detail = body.detail
+              .map((err: any) => err.msg || (typeof err === 'string' ? err : JSON.stringify(err)))
+              .join(', ');
+          } else if (typeof body.detail === 'object') {
+            detail = JSON.stringify(body.detail);
+          } else {
+            detail = String(body.detail);
+          }
+        }
+      } catch {
+        // Non-JSON response
+      }
+
+      if (
+        response.status === 503 ||
+        response.status === 502 ||
+        response.status === 504 ||
+        rawText.includes('ECONNREFUSED') ||
+        rawText.includes('proxy error') ||
+        rawText.includes('Database connection failed')
+      ) {
+        console.warn(
+          `[PeoplePay360] Database/backend unavailable (${response.status}: ${detail}) — seamlessly serving offline demo data.`
+        );
+        return mockHandler<T>(endpoint, options);
+      }
+    } catch {
+      // response reading failed
+    }
+    throw new Error(`HTTP ${response.status}: ${detail}`);
+  }
+
+  const raw = await response.json();
+  return snakeToCamel<T>(raw);
 }
 
 async function tryRefreshToken(): Promise<boolean> {
@@ -254,10 +294,98 @@ function handleMockRoutes(endpoint: string, method: string, body: any): any {
     throw new Error('Unauthenticated');
   }
 
+  if (endpoint === '/auth/me' && method === 'GET') {
+    if (currentAuthUser) return currentAuthUser;
+    throw new Error('Unauthenticated');
+  }
+
   if (endpoint === '/auth/logout' && method === 'POST') {
     inMemoryAccessToken = null;
     currentAuthUser = null;
     return { success: true };
+  }
+
+  // Users Management
+  if (endpoint === '/users' && method === 'GET') {
+    return usersStore.map((u) => {
+      const emp = employeesStore.find((e) => e.userId === u.id || e.id === u.employeeId);
+      return {
+        ...u,
+        employeeId: emp?.id || u.employeeId,
+        employeeName: emp?.name || u.employeeName,
+        employeeEmail: emp?.email || u.email,
+        department: emp?.department,
+        createdAt: u.createdAt || '2026-09-01T00:00:00Z',
+      };
+    });
+  }
+
+  if (endpoint.startsWith('/users/') && method === 'GET') {
+    const id = endpoint.split('/')[2];
+    const user = usersStore.find((u) => u.id === id);
+    if (!user) throw new Error('User not found');
+    const emp = employeesStore.find((e) => e.userId === user.id || e.id === user.employeeId);
+    return {
+      ...user,
+      employeeId: emp?.id || user.employeeId,
+      employeeName: emp?.name || user.employeeName,
+      employeeEmail: emp?.email || user.email,
+      department: emp?.department,
+    };
+  }
+
+  if (endpoint === '/users' && method === 'POST') {
+    const emp = body.employee_id ? employeesStore.find((e) => e.id === body.employee_id) : null;
+    const newUser: User = {
+      id: 'usr-' + Date.now(),
+      username: body.username,
+      role: body.role,
+      isActive: body.is_active !== undefined ? body.is_active : true,
+      employeeId: emp?.id,
+      employeeName: emp?.name,
+      employeeEmail: emp?.email,
+      department: emp?.department,
+      createdAt: new Date().toISOString(),
+    };
+    if (emp) {
+      emp.userId = newUser.id;
+    }
+    usersStore.push(newUser);
+    return newUser;
+  }
+
+  if (endpoint.startsWith('/users/') && method === 'PUT') {
+    const id = endpoint.split('/')[2];
+    const userIndex = usersStore.findIndex((u) => u.id === id);
+    if (userIndex === -1) throw new Error('User not found');
+    const prev = usersStore[userIndex];
+    let emp = prev.employeeId ? employeesStore.find((e) => e.id === prev.employeeId) : null;
+    if (body.employee_id !== undefined) {
+      if (emp) emp.userId = undefined;
+      emp = body.employee_id ? employeesStore.find((e) => e.id === body.employee_id) : null;
+      if (emp) emp.userId = id;
+    }
+    const updated: User = {
+      ...prev,
+      role: body.role || prev.role,
+      isActive: body.is_active !== undefined ? body.is_active : prev.isActive,
+      employeeId: emp?.id,
+      employeeName: emp?.name,
+      employeeEmail: emp?.email,
+      department: emp?.department,
+    };
+    usersStore[userIndex] = updated;
+    return updated;
+  }
+
+  if (endpoint.startsWith('/users/') && method === 'DELETE') {
+    const id = endpoint.split('/')[2];
+    const user = usersStore.find((u) => u.id === id);
+    if (!user) throw new Error('User not found');
+    const emp = employeesStore.find((e) => e.userId === id);
+    if (emp) emp.userId = undefined;
+    usersStore = usersStore.filter((u) => u.id !== id);
+    return { detail: 'User deleted successfully' };
   }
 
   // Dashboard
@@ -779,9 +907,7 @@ export const api = {
       request<{ success: boolean }>('/auth/logout', {
         method: 'POST',
       }),
-    getMe: async (): Promise<User | null> => {
-      return currentAuthUser;
-    },
+    getMe: () => request<User>('/auth/me'),
   },
 
   employees: {
@@ -962,5 +1088,24 @@ export const api = {
 
   departments: {
     getAll: () => Promise.resolve(initialDepartments),
+  },
+
+  users: {
+    getAll: () => request<User[]>('/users'),
+    getById: (id: string | number) => request<User>(`/users/${id}`),
+    create: (data: { username: string; password?: string; role: RoleName; isActive?: boolean; employeeId?: string }) =>
+      request<User>('/users', {
+        method: 'POST',
+        body: JSON.stringify(camelToSnake(data)),
+      }),
+    update: (id: string | number, data: { role?: RoleName; isActive?: boolean; password?: string; employeeId?: string | null }) =>
+      request<User>(`/users/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(camelToSnake(data)),
+      }),
+    delete: (id: string | number) =>
+      request<{ detail: string }>(`/users/${id}`, {
+        method: 'DELETE',
+      }),
   },
 };

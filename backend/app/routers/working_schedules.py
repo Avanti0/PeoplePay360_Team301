@@ -1,3 +1,4 @@
+from uuid import UUID
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from app.db.session import get_db
@@ -19,15 +20,15 @@ def create_schedule(data: WorkingScheduleCreate, db: Session = Depends(get_db), 
 
 
 @router.get("/{schedule_id}", response_model=WorkingScheduleOut)
-def get_schedule(schedule_id: int, db: Session = Depends(get_db), _=Depends(require_hr_manager)):
+def get_schedule(schedule_id: UUID, db: Session = Depends(get_db), _=Depends(require_hr_manager)):
     return svc.get_schedule(db, schedule_id)
 
 
 @router.put("/{schedule_id}", response_model=WorkingScheduleOut)
-def update_schedule(schedule_id: int, data: WorkingScheduleUpdate, db: Session = Depends(get_db), _=Depends(require_hr_manager)):
+def update_schedule(schedule_id: UUID, data: WorkingScheduleUpdate, db: Session = Depends(get_db), _=Depends(require_hr_manager)):
     return svc.update_schedule(db, schedule_id, data)
 
 
 @router.delete("/{schedule_id}", status_code=204)
-def delete_schedule(schedule_id: int, db: Session = Depends(get_db), _=Depends(require_admin)):
+def delete_schedule(schedule_id: UUID, db: Session = Depends(get_db), _=Depends(require_admin)):
     svc.delete_schedule(db, schedule_id)

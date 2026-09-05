@@ -1,6 +1,7 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional
 from datetime import time
+from uuid import UUID
 
 
 class ScheduleLineCreate(BaseModel):
@@ -11,26 +12,25 @@ class ScheduleLineCreate(BaseModel):
     break_minutes: int = 0
 
 class ScheduleLineOut(ScheduleLineCreate):
-    id: int
-    schedule_id: int
-    class Config: from_attributes = True
+    id: UUID
+    schedule_id: UUID
+
+    model_config = ConfigDict(from_attributes=True)
 
 class WorkingScheduleCreate(BaseModel):
     name: str
-    schedule_type: str = "full_time"
     lines: list[ScheduleLineCreate] = []
 
 class WorkingScheduleUpdate(BaseModel):
     name: Optional[str] = None
-    schedule_type: Optional[str] = None
     is_active: Optional[bool] = None
     lines: Optional[list[ScheduleLineCreate]] = None  # replaces all lines if provided
 
 class WorkingScheduleOut(BaseModel):
-    id: int
+    id: UUID
     name: str
-    schedule_type: str
     is_active: bool
     weekly_hours: float         # computed
     lines: list[ScheduleLineOut] = []
-    class Config: from_attributes = True
+
+    model_config = ConfigDict(from_attributes=True)

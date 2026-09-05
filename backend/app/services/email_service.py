@@ -40,7 +40,7 @@ def _send_email(to: str, subject: str, body: str, attachment_path: str):
         server.sendmail(EMAIL_FROM, to, msg.as_string())
 
 
-def send_payslips_bulk(db: Session, payrun_id: int) -> dict:
+def send_payslips_bulk(db: Session, payrun_id) -> dict:
     payrun = db.query(Payrun).filter(Payrun.id == payrun_id).first()
     if not payrun:
         raise HTTPException(status_code=404, detail="Payrun not found")
@@ -56,18 +56,18 @@ def send_payslips_bulk(db: Session, payrun_id: int) -> dict:
             continue
 
         try:
-            # generate PDF if not already done
-            pdf_path = payslip.pdf_path or generate_payslip_pdf(db, payslip.id)
+            pdf_path = generate_payslip_pdf(db, payslip.id)
+            total_deductions = float(payslip.gross_salary) - float(payslip.net_salary)
 
             period = f"{payrun.period_start} to {payrun.period_end}"
             body = f"""
-            <p>Dear {emp.first_name},</p>
+            <p>Dear {emp.name},</p>
             <p>Please find attached your payslip for the period <strong>{period}</strong>.</p>
             <table style="border-collapse:collapse;font-size:14px;">
               <tr><td style="padding:4px 12px 4px 0;color:#666">Gross Salary</td>
                   <td><strong>₹ {float(payslip.gross_salary):,.2f}</strong></td></tr>
               <tr><td style="padding:4px 12px 4px 0;color:#666">Deductions</td>
-                  <td><strong>₹ {float(payslip.total_deductions):,.2f}</strong></td></tr>
+                  <td><strong>₹ {total_deductions:,.2f}</strong></td></tr>
               <tr><td style="padding:4px 12px 4px 0;color:#666">Net Salary</td>
                   <td><strong>₹ {float(payslip.net_salary):,.2f}</strong></td></tr>
             </table>
@@ -83,8 +83,6 @@ def send_payslips_bulk(db: Session, payrun_id: int) -> dict:
                 attachment_path=pdf_path,
             )
 
-            payslip.emailed_at = datetime.now(timezone.utc)
-            db.commit()
             sent += 1
 
         except Exception as e:

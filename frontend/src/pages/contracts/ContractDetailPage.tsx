@@ -69,11 +69,11 @@ export const ContractDetailPage: React.FC = () => {
   const handleStatusChange = async (newStatus: 'draft' | 'active' | 'expired' | 'cancelled') => {
     if (!contract) return;
     try {
-      const updated = { ...contract, status: newStatus };
-      setContract(updated);
+      const updated = await api.contracts.update(contract.id, { status: newStatus });
+      setContract(updated || { ...contract, status: newStatus });
       success(`Contract status updated to ${newStatus}`);
-    } catch {
-      error('Failed to update status');
+    } catch (err: any) {
+      error(err.message || 'Failed to update status');
     }
   };
 

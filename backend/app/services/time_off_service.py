@@ -212,7 +212,6 @@ def approve_request(db: Session, request_id: UUID) -> TimeOffRequest:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Linked allocation is not approved")
         if allocation.remaining < request.duration:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Insufficient allocation balance")
-        allocation.taken += request.duration
 
     request.status = "approved"
     db.commit()

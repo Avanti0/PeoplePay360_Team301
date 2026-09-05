@@ -35,10 +35,13 @@ export const EmployeesPage: React.FC = () => {
 
   // New Employee Modal
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     phone: '',
+    jobPosition: '',
     department: 'Engineering',
     employmentStatus: 'active' as const,
     bankAccountNumber: '',
@@ -59,6 +62,9 @@ export const EmployeesPage: React.FC = () => {
       ]);
       setEmployees(empData);
       setDepartments(deptData);
+      if (deptData.length > 0 && !formData.department) {
+        setFormData((prev) => ({ ...prev, department: deptData[0].name }));
+      }
     } catch {
       error('Failed to load employee list');
     } finally {
@@ -81,13 +87,71 @@ export const EmployeesPage: React.FC = () => {
 
   const handleCreateEmployee = async (e: React.FormEvent) => {
     e.preventDefault();
+    const errors: Record<string, string> = {};
+
+    const cleanName = formData.name.trim();
+    if (!cleanName) {
+      errors.name = 'Full name is required';
+    } else if (cleanName.length < 2) {
+      errors.name = 'Full name must be at least 2 characters';
+    }
+
+    const cleanEmail = formData.email.trim();
+    if (!cleanEmail) {
+      errors.email = 'Email address is required';
+    } else if (!/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(cleanEmail)) {
+      errors.email = 'Please enter a valid email address';
+    }
+
+    const cleanPhone = formData.phone.trim();
+    if (cleanPhone) {
+      const digits = cleanPhone.replace(/[^0-9]/g, '');
+      if (digits.length < 7 || digits.length > 15) {
+        errors.phone = 'Phone number must be between 7 and 15 digits';
+      }
+    }
+
+    const cleanIfsc = formData.bankIfsc.trim().toUpperCase();
+    if (cleanIfsc && !/^[A-Z0-9]{4,11}$/.test(cleanIfsc)) {
+      errors.bankIfsc = 'IFSC code must be between 4 and 11 alphanumeric characters';
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      return;
+    }
+
+    setFormErrors({});
+    setIsSubmitting(true);
     try {
-      const created = await api.employees.create(formData);
+      const created = await api.employees.create({
+        ...formData,
+        name: cleanName,
+        email: cleanEmail,
+        phone: cleanPhone || undefined,
+        jobPosition: formData.jobPosition.trim() || undefined,
+        bankAccountNumber: formData.bankAccountNumber.trim() || undefined,
+        bankName: formData.bankName.trim() || undefined,
+        bankIfsc: cleanIfsc || undefined,
+      });
       success(`Employee ${created.name} created successfully!`);
       setIsModalOpen(false);
+      setFormData({
+        name: '',
+        email: '',
+        phone: '',
+        jobPosition: '',
+        department: departments[0]?.name || 'Engineering',
+        employmentStatus: 'active',
+        bankAccountNumber: '',
+        bankName: '',
+        bankIfsc: '',
+      });
       loadData();
-    } catch {
-      error('Failed to create employee profile');
+    } catch (err: any) {
+      error(err.message || 'Failed to create employee profile');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -310,35 +374,79 @@ export const EmployeesPage: React.FC = () => {
         <form onSubmit={handleCreateEmployee} className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="sm:col-span-2">
-              <label className="block text-xs font-bold text-slate-700 mb-1">Full Name</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Full Name <span className="text-rose-500">*</span>
+              </label>
               <input
                 type="text"
                 value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
+                onChange={(e) => {
+                  setFormData({ ...formData, name: e.target.value });
+                  if (formErrors.name) setFormErrors({ ...formErrors, name: '' });
+                }}
+                className={`w-full px-3 py-2 text-xs rounded-xl border ${
+                  formErrors.name ? 'border-rose-300 bg-rose-50/40' : 'border-slate-300'
+                } focus:ring-2 focus:ring-blue-500 outline-none`}
+                placeholder="e.g. Aditi Rao"
                 required
               />
+              {formErrors.name && (
+                <p className="text-[11px] font-semibold text-rose-600 mt-1">{formErrors.name}</p>
+              )}
             </div>
+
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Email Address</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Email Address <span className="text-rose-500">*</span>
+              </label>
               <input
                 type="email"
                 value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
+                onChange={(e) => {
+                  setFormData({ ...formData, email: e.target.value });
+                  if (formErrors.email) setFormErrors({ ...formErrors, email: '' });
+                }}
+                className={`w-full px-3 py-2 text-xs rounded-xl border ${
+                  formErrors.email ? 'border-rose-300 bg-rose-50/40' : 'border-slate-300'
+                } focus:ring-2 focus:ring-blue-500 outline-none`}
+                placeholder="e.g. aditi.rao@peoplepay360.demo"
                 required
               />
+              {formErrors.email && (
+                <p className="text-[11px] font-semibold text-rose-600 mt-1">{formErrors.email}</p>
+              )}
             </div>
+
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">Phone Number</label>
               <input
-                type="text"
+                type="tel"
                 value={formData.phone}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                onChange={(e) => {
+                  setFormData({ ...formData, phone: e.target.value });
+                  if (formErrors.phone) setFormErrors({ ...formErrors, phone: '' });
+                }}
                 placeholder="+91 98765 00000"
+                className={`w-full px-3 py-2 text-xs rounded-xl border ${
+                  formErrors.phone ? 'border-rose-300 bg-rose-50/40' : 'border-slate-300'
+                } focus:ring-2 focus:ring-blue-500 outline-none`}
+              />
+              {formErrors.phone && (
+                <p className="text-[11px] font-semibold text-rose-600 mt-1">{formErrors.phone}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Job Position / Title</label>
+              <input
+                type="text"
+                value={formData.jobPosition}
+                onChange={(e) => setFormData({ ...formData, jobPosition: e.target.value })}
+                placeholder="e.g. Senior Software Engineer"
                 className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
               />
             </div>
+
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">Department</label>
               <select
@@ -369,7 +477,7 @@ export const EmployeesPage: React.FC = () => {
                   value={formData.bankAccountNumber}
                   onChange={(e) => setFormData({ ...formData, bankAccountNumber: e.target.value })}
                   placeholder="ACC-XXXX-XXXX"
-                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none font-mono"
                 />
               </div>
               <div>
@@ -391,10 +499,18 @@ export const EmployeesPage: React.FC = () => {
                 <input
                   type="text"
                   value={formData.bankIfsc}
-                  onChange={(e) => setFormData({ ...formData, bankIfsc: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, bankIfsc: e.target.value.toUpperCase() });
+                    if (formErrors.bankIfsc) setFormErrors({ ...formErrors, bankIfsc: '' });
+                  }}
                   placeholder="NTBK0001234"
-                  className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
+                  className={`w-full px-3 py-2 text-xs rounded-xl border ${
+                    formErrors.bankIfsc ? 'border-rose-300 bg-rose-50/40' : 'border-slate-300'
+                  } focus:ring-2 focus:ring-blue-500 outline-none uppercase font-mono`}
                 />
+                {formErrors.bankIfsc && (
+                  <p className="text-[10px] font-semibold text-rose-600 mt-1">{formErrors.bankIfsc}</p>
+                )}
               </div>
             </div>
           </div>
@@ -409,9 +525,10 @@ export const EmployeesPage: React.FC = () => {
             </button>
             <button
               type="submit"
-              className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold"
+              disabled={isSubmitting}
+              className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold disabled:opacity-50"
             >
-              Save Employee
+              {isSubmitting ? 'Saving...' : 'Save Employee'}
             </button>
           </div>
         </form>

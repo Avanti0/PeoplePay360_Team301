@@ -28,16 +28,18 @@ export const ContractsPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(true);
 
   // Form State
   const [formData, setFormData] = useState({
-    employeeId: '2',
-    dateStart: '2026-09-01',
+    employeeId: '',
+    dateStart: new Date().toISOString().slice(0, 10),
     dateEnd: '',
-    wage: 100000,
-    salaryStructureId: '1',
-    workingScheduleId: '1',
+    wage: 600000,
+    salaryStructureId: '',
+    workingScheduleId: '',
     status: 'draft' as const,
   });
 
@@ -58,6 +60,14 @@ export const ContractsPage: React.FC = () => {
       setEmployees(eList);
       setStructures(sList);
       setSchedules(schedList);
+
+      // Initialize form with real IDs if not set
+      setFormData((prev) => ({
+        ...prev,
+        employeeId: prev.employeeId || (eList[0]?.id ? String(eList[0].id) : ''),
+        salaryStructureId: prev.salaryStructureId || (sList[0]?.id ? String(sList[0].id) : ''),
+        workingScheduleId: prev.workingScheduleId || (schedList[0]?.id ? String(schedList[0].id) : ''),
+      }));
     } catch {
       error('Failed to load contracts');
     } finally {
@@ -81,6 +91,32 @@ export const ContractsPage: React.FC = () => {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
+    const errors: Record<string, string> = {};
+
+    if (!formData.employeeId) {
+      errors.employeeId = 'Please select an employee';
+    }
+
+    if (!formData.dateStart) {
+      errors.dateStart = 'Start date is required';
+    }
+
+    if (formData.dateEnd && formData.dateStart && new Date(formData.dateEnd) < new Date(formData.dateStart)) {
+      errors.dateEnd = 'End date cannot be earlier than start date';
+    }
+
+    if (isNaN(Number(formData.wage)) || Number(formData.wage) < 0) {
+      errors.wage = 'Gross annual wage must be a non-negative number';
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      return;
+    }
+
+    setFormErrors({});
+    setIsSubmitting(true);
+
     const emp = employees.find((em) => String(em.id) === String(formData.employeeId));
     const struct = structures.find((s) => String(s.id) === String(formData.salaryStructureId));
     const sched = schedules.find((sc) => String(sc.id) === String(formData.workingScheduleId));
@@ -88,6 +124,10 @@ export const ContractsPage: React.FC = () => {
     try {
       const newContract = await api.contracts.create({
         ...formData,
+        employeeId: formData.employeeId,
+        salaryStructureId: formData.salaryStructureId || undefined,
+        workingScheduleId: formData.workingScheduleId || undefined,
+        wage: Number(formData.wage),
         employeeName: emp?.name,
         salaryStructureName: struct?.name,
         workingScheduleName: sched?.name,
@@ -96,11 +136,13 @@ export const ContractsPage: React.FC = () => {
         dateEnd: formData.dateEnd || null,
       });
 
-      success(`Contract created for ${newContract.employeeName}`);
+      success(`Contract created for ${newContract.employeeName || 'employee'}`);
       setIsModalOpen(false);
       loadData();
-    } catch {
-      error('Error creating contract');
+    } catch (err: any) {
+      error(err.message || 'Error creating contract');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -232,30 +274,50 @@ export const ContractsPage: React.FC = () => {
       >
         <form onSubmit={handleCreate} className="space-y-4">
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">Employee</label>
+            <label className="block text-xs font-bold text-slate-700 mb-1">
+              Employee <span className="text-rose-500">*</span>
+            </label>
             <select
               value={formData.employeeId}
-              onChange={(e) => setFormData({ ...formData, employeeId: e.target.value })}
-              className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
+              onChange={(e) => {
+                setFormData({ ...formData, employeeId: e.target.value });
+                if (formErrors.employeeId) setFormErrors({ ...formErrors, employeeId: '' });
+              }}
+              className={`w-full px-3 py-2 text-xs rounded-xl border ${
+                formErrors.employeeId ? 'border-rose-300 bg-rose-50/40' : 'border-slate-300'
+              } focus:ring-2 focus:ring-blue-500 outline-none`}
             >
               {employees.map((emp) => (
                 <option key={emp.id} value={emp.id}>
-                  {emp.name}
+                  {emp.name} ({emp.department})
                 </option>
               ))}
             </select>
+            {formErrors.employeeId && (
+              <p className="text-[11px] font-semibold text-rose-600 mt-1">{formErrors.employeeId}</p>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Start Date</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Start Date <span className="text-rose-500">*</span>
+              </label>
               <input
                 type="date"
                 value={formData.dateStart}
-                onChange={(e) => setFormData({ ...formData, dateStart: e.target.value })}
-                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
+                onChange={(e) => {
+                  setFormData({ ...formData, dateStart: e.target.value });
+                  if (formErrors.dateStart) setFormErrors({ ...formErrors, dateStart: '' });
+                }}
+                className={`w-full px-3 py-2 text-xs rounded-xl border ${
+                  formErrors.dateStart ? 'border-rose-300 bg-rose-50/40' : 'border-slate-300'
+                } focus:ring-2 focus:ring-blue-500 outline-none`}
                 required
               />
+              {formErrors.dateStart && (
+                <p className="text-[11px] font-semibold text-rose-600 mt-1">{formErrors.dateStart}</p>
+              )}
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
@@ -264,25 +326,41 @@ export const ContractsPage: React.FC = () => {
               <input
                 type="date"
                 value={formData.dateEnd}
-                onChange={(e) => setFormData({ ...formData, dateEnd: e.target.value })}
-                className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
+                onChange={(e) => {
+                  setFormData({ ...formData, dateEnd: e.target.value });
+                  if (formErrors.dateEnd) setFormErrors({ ...formErrors, dateEnd: '' });
+                }}
+                className={`w-full px-3 py-2 text-xs rounded-xl border ${
+                  formErrors.dateEnd ? 'border-rose-300 bg-rose-50/40' : 'border-slate-300'
+                } focus:ring-2 focus:ring-blue-500 outline-none`}
               />
+              {formErrors.dateEnd && (
+                <p className="text-[11px] font-semibold text-rose-600 mt-1">{formErrors.dateEnd}</p>
+              )}
             </div>
           </div>
 
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">
-              Gross Annual Wage (₹)
+              Gross Annual Wage (₹) <span className="text-rose-500">*</span>
             </label>
             <input
               type="number"
               value={formData.wage}
-              onChange={(e) => setFormData({ ...formData, wage: Number(e.target.value) })}
+              onChange={(e) => {
+                setFormData({ ...formData, wage: Number(e.target.value) });
+                if (formErrors.wage) setFormErrors({ ...formErrors, wage: '' });
+              }}
               step="10000"
               min="0"
-              className="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none font-mono"
+              className={`w-full px-3 py-2 text-xs rounded-xl border ${
+                formErrors.wage ? 'border-rose-300 bg-rose-50/40' : 'border-slate-300'
+              } focus:ring-2 focus:ring-blue-500 outline-none font-mono`}
               required
             />
+            {formErrors.wage && (
+              <p className="text-[11px] font-semibold text-rose-600 mt-1">{formErrors.wage}</p>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -329,9 +407,10 @@ export const ContractsPage: React.FC = () => {
             </button>
             <button
               type="submit"
-              className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold"
+              disabled={isSubmitting}
+              className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold disabled:opacity-50"
             >
-              Save Contract
+              {isSubmitting ? 'Saving...' : 'Save Contract'}
             </button>
           </div>
         </form>

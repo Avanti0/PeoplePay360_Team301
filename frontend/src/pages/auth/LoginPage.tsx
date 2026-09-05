@@ -2,37 +2,46 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
-import { demoUsers } from '../../services/mockData';
-import { Shield, KeyRound, UserCheck, ArrowRight } from 'lucide-react';
-import { RoleName } from '../../types';
+import { Shield, KeyRound, ArrowRight } from 'lucide-react';
 
 export const LoginPage: React.FC = () => {
-  const { login, switchUserRole } = useAuth();
+  const { login } = useAuth();
   const { success, error } = useToast();
   const navigate = useNavigate();
 
-  const [username, setUsername] = useState('admin');
-  const [password, setPassword] = useState('admin123');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<{ username?: string; password?: string }>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const errors: { username?: string; password?: string } = {};
+    const cleanUsername = username.trim();
+
+    if (!cleanUsername) {
+      errors.username = 'Username or email is required';
+    }
+    if (!password) {
+      errors.password = 'Password is required';
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      return;
+    }
+
+    setFieldErrors({});
     setIsSubmitting(true);
     try {
-      await login(username, password);
-      success(`Welcome back, ${username}!`);
+      await login(cleanUsername, password);
+      success(`Welcome back, ${cleanUsername}!`);
       navigate('/dashboard');
-    } catch {
-      error('Authentication failed. Please verify credentials.');
+    } catch (err: any) {
+      error(err.message || 'Authentication failed. Please verify credentials.');
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const handleQuickLogin = (role: RoleName) => {
-    switchUserRole(role);
-    success(`Signed in as ${role.replace(/_/g, ' ').toUpperCase()}`);
-    navigate('/dashboard');
   };
 
   return (
@@ -52,32 +61,52 @@ export const LoginPage: React.FC = () => {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                Username or Email
+                Username or Email <span className="text-rose-500">*</span>
               </label>
               <div className="relative">
                 <input
                   type="text"
                   value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  className="w-full pl-3 pr-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm font-medium text-slate-900 outline-none transition-all"
+                  onChange={(e) => {
+                    setUsername(e.target.value);
+                    if (fieldErrors.username) setFieldErrors({ ...fieldErrors, username: undefined });
+                  }}
+                  className={`w-full pl-3 pr-4 py-2.5 rounded-xl border ${
+                    fieldErrors.username
+                      ? 'border-rose-300 bg-rose-50/40 text-rose-900 focus:ring-rose-500 focus:border-rose-500'
+                      : 'border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                  } text-sm font-medium text-slate-900 outline-none transition-all`}
                   required
                 />
               </div>
+              {fieldErrors.username && (
+                <p className="text-[11px] font-semibold text-rose-600 mt-1">{fieldErrors.username}</p>
+              )}
             </div>
 
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                Password
+                Password <span className="text-rose-500">*</span>
               </label>
               <div className="relative">
                 <input
                   type="password"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-3 pr-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm font-medium text-slate-900 outline-none transition-all"
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    if (fieldErrors.password) setFieldErrors({ ...fieldErrors, password: undefined });
+                  }}
+                  className={`w-full pl-3 pr-4 py-2.5 rounded-xl border ${
+                    fieldErrors.password
+                      ? 'border-rose-300 bg-rose-50/40 text-rose-900 focus:ring-rose-500 focus:border-rose-500'
+                      : 'border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                  } text-sm font-medium text-slate-900 outline-none transition-all`}
                   required
                 />
               </div>
+              {fieldErrors.password && (
+                <p className="text-[11px] font-semibold text-rose-600 mt-1">{fieldErrors.password}</p>
+              )}
             </div>
 
             <button
@@ -90,36 +119,6 @@ export const LoginPage: React.FC = () => {
               <ArrowRight className="w-4 h-4" />
             </button>
           </form>
-
-          {/* Hackathon Quick Role Switcher */}
-          <div className="mt-8 pt-6 border-t border-slate-100">
-            <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">
-              <UserCheck className="w-4 h-4 text-blue-500" />
-              <span>Quick Login by Demo Persona</span>
-            </div>
-            <div className="grid grid-cols-1 gap-2">
-              {demoUsers.map((u) => (
-                <button
-                  key={u.role}
-                  type="button"
-                  onClick={() => handleQuickLogin(u.role)}
-                  className="flex items-center justify-between px-3.5 py-2 rounded-xl border border-slate-200 hover:border-blue-300 hover:bg-blue-50/50 text-left transition-all group"
-                >
-                  <div>
-                    <span className="text-xs font-bold text-slate-800 group-hover:text-blue-600">
-                      {u.employeeName}
-                    </span>
-                    <span className="text-[10px] text-slate-500 block capitalize">
-                      {u.role.replace(/_/g, ' ')}
-                    </span>
-                  </div>
-                  <span className="text-[10px] font-semibold text-blue-600 group-hover:translate-x-0.5 transition-transform">
-                    Enter &rarr;
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
         </div>
 
         {/* Security Notice */}

@@ -1,3 +1,4 @@
+from decimal import Decimal
 from sqlalchemy import Column, Text, Boolean, Date, Numeric, TIMESTAMP, ForeignKey, CheckConstraint, func, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
@@ -26,10 +27,6 @@ class Allocation(Base):
     employee_id      = Column(UUID(as_uuid=True), ForeignKey("employees.id", ondelete="CASCADE"), nullable=False)
     time_off_type_id = Column(UUID(as_uuid=True), ForeignKey("time_off_types.id"), nullable=False)
     number_of_days   = Column(Numeric(6, 2), nullable=False)
-    taken            = Column(Numeric(6, 2), nullable=False, server_default="0")
-    # remaining is a GENERATED ALWAYS AS (number_of_days - taken) STORED
-    # column in schema.sql - read-only from the ORM's point of view.
-    remaining        = Column(Numeric(6, 2))
     date_from        = Column(Date, nullable=False)
     date_to          = Column(Date)
     status           = Column(allocation_status_enum, nullable=False, server_default="draft")
@@ -37,7 +34,23 @@ class Allocation(Base):
 
     employee      = relationship("Employee", back_populates="allocations", foreign_keys=[employee_id])
     time_off_type = relationship("TimeOffType", back_populates="allocations")
-    requests      = relationship("TimeOffRequest", back_populates="allocation")
+    requests      = relationship("TimeOffRequest", back_populates="allocation", lazy="selectin")
+
+    @property
+    def taken(self) -> Decimal:
+        """Derived from approved requests consuming this allocation."""
+        if not self.requests:
+            return Decimal("0.00")
+        return sum(
+            (Decimal(str(r.duration)) for r in self.requests if r.status == "approved"),
+            Decimal("0.00"),
+        )
+
+    @property
+    def remaining(self) -> Decimal:
+        """Derived: number_of_days - taken."""
+        days = Decimal(str(self.number_of_days)) if self.number_of_days is not None else Decimal("0.00")
+        return days - self.taken
 
 
 class TimeOffRequest(Base):
