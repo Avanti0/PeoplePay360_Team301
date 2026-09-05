@@ -1,3 +1,4 @@
+from uuid import UUID
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
@@ -16,14 +17,21 @@ def _weekly_hours(schedule: WorkingSchedule) -> float:
 
 
 def _to_out(schedule: WorkingSchedule) -> dict:
-    return {**schedule.__dict__, "weekly_hours": _weekly_hours(schedule)}
+    return {
+        "id": schedule.id,
+        "name": schedule.name,
+        "is_active": schedule.is_active,
+        "created_at": schedule.created_at,
+        "weekly_hours": _weekly_hours(schedule),
+        "lines": schedule.lines,
+    }
 
 
 def list_schedules(db: Session):
     return [_to_out(s) for s in db.query(WorkingSchedule).order_by(WorkingSchedule.name).all()]
 
 
-def get_schedule(db: Session, schedule_id: int):
+def get_schedule(db: Session, schedule_id: UUID):
     obj = db.query(WorkingSchedule).filter(WorkingSchedule.id == schedule_id).first()
     if not obj:
         raise HTTPException(status_code=404, detail="Working schedule not found")
@@ -45,7 +53,7 @@ def create_schedule(db: Session, data: WorkingScheduleCreate):
     return _to_out(obj)
 
 
-def update_schedule(db: Session, schedule_id: int, data: WorkingScheduleUpdate):
+def update_schedule(db: Session, schedule_id: UUID, data: WorkingScheduleUpdate):
     obj = db.query(WorkingSchedule).filter(WorkingSchedule.id == schedule_id).first()
     if not obj:
         raise HTTPException(status_code=404, detail="Working schedule not found")
@@ -69,7 +77,7 @@ def update_schedule(db: Session, schedule_id: int, data: WorkingScheduleUpdate):
     return _to_out(obj)
 
 
-def delete_schedule(db: Session, schedule_id: int):
+def delete_schedule(db: Session, schedule_id: UUID):
     obj = db.query(WorkingSchedule).filter(WorkingSchedule.id == schedule_id).first()
     if not obj:
         raise HTTPException(status_code=404, detail="Working schedule not found")

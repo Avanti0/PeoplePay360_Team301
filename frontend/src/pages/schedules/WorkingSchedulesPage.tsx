@@ -55,6 +55,11 @@ export const WorkingSchedulesPage: React.FC = () => {
     }
   };
 
+  const formatTime = (timeStr?: string | null) => {
+    if (!timeStr) return '';
+    return timeStr.length >= 5 ? timeStr.slice(0, 5) : timeStr;
+  };
+
   const calculateHoursForLine = (line: WorkingScheduleLine) => {
     if (!line.isWorkingDay || !line.startTime || !line.endTime) return 0;
     const [startH, startM] = line.startTime.split(':').map(Number);
@@ -268,11 +273,11 @@ export const WorkingSchedulesPage: React.FC = () => {
                           <div className="flex items-center gap-1.5 font-medium">
                             <Clock className="w-3.5 h-3.5 text-slate-400" />
                             <span>
-                              {line?.startTime} &ndash; {line?.endTime}
+                              {formatTime(line?.startTime)} &ndash; {formatTime(line?.endTime)}
                             </span>
                           </div>
                           <span className="text-slate-400">|</span>
-                          <span className="text-slate-500">{line?.breakMinutes}m break</span>
+                          <span className="text-slate-500">{line?.breakMinutes || 0}m break</span>
                         </div>
                       ) : (
                         <span className="text-xs font-semibold text-slate-400 italic">Rest Day</span>
@@ -286,7 +291,7 @@ export const WorkingSchedulesPage: React.FC = () => {
                               : 'bg-slate-100 text-slate-400'
                           }`}
                         >
-                          {dailyHours > 0 ? `${dailyHours} hrs` : '0 hrs'}
+                          {dailyHours > 0 ? `${Number(dailyHours.toFixed(2))} hrs` : '0 hrs'}
                         </span>
                       </div>
                     </div>
