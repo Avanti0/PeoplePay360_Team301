@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
-import { Header } from './Header';
+import { Topbar } from './Topbar';
 
 export const AppLayout: React.FC = () => {
   const location = useLocation();
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
 
   const getPageTitle = (pathname: string) => {
     if (pathname.startsWith('/dashboard') || pathname === '/') return 'Payroll Operations Dashboard';
@@ -21,10 +22,16 @@ export const AppLayout: React.FC = () => {
 
   return (
     <div className="flex h-screen bg-slate-50 text-slate-900 overflow-hidden font-sans">
-      <Sidebar />
+      <Sidebar
+        isMobileOpen={isMobileOpen}
+        onCloseMobile={() => setIsMobileOpen(false)}
+      />
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <Header title={getPageTitle(location.pathname)} />
-        <main className="flex-1 overflow-y-auto p-6 md:p-8">
+        <Topbar
+          title={getPageTitle(location.pathname)}
+          onOpenMobileSidebar={() => setIsMobileOpen(true)}
+        />
+        <main className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
           <div className="max-w-7xl mx-auto space-y-6">
             <Outlet />
           </div>

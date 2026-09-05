@@ -111,7 +111,7 @@ Status key: ⬜ Not started | 🔄 In progress | ✅ Done | 🔀 Merged to main
 
 | Date | Branch | Merged by | What was merged |
 |------|--------|-----------|-----------------|
-| (prior to 2026-09-05) | `feature/database` | (unrecorded) | Initial schema + seed data merge into `main` |
+| 2026-09-05 | `feature/frontend` | T. Lakshmi Vyshnavi | App Shell (Sidebar with 5 grouped navigation sections, Topbar with responsive search/notifications/breadcrumbs, UserMenu with profile/role switcher) |
 | 2026-09-05 | `feature/database` | Maddi Soumya | Schema/seed rewritten to match this file's Naming Conventions + `docs/modules/*.md` exactly (UUID ids, `employees.name`, `date_start`/`date_end`, `allocations`, `schedule_lines`, etc.) - not yet re-merged into `main`, see note below |
 
 ---
