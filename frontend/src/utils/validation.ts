@@ -89,11 +89,18 @@ export const validateSalaryRuleCode = (code: string): string | null => {
   return null;
 };
 
-export const validatePhone = (phone: string): string | null => {
-  if (!phone || !phone.trim()) return null; // Optional
-  const digits = phone.replace(/[^0-9]/g, '');
+export const validatePhone = (phone?: string | null, isRequired = false): string | null => {
+  if (!phone || !phone.trim()) {
+    return isRequired ? 'Phone number is required' : null;
+  }
+  const cleanPhone = phone.trim();
+  const phonePattern = /^\+?[0-9\s\-().]{7,20}$/;
+  if (!phonePattern.test(cleanPhone)) {
+    return 'Please enter a valid phone number (e.g. +91 9876543210 or 9876543210)';
+  }
+  const digits = cleanPhone.replace(/[^0-9]/g, '');
   if (digits.length < 7 || digits.length > 15) {
-    return 'Please enter a valid phone number (7 to 15 digits)';
+    return 'Phone number must contain between 7 and 15 digits';
   }
   return null;
 };

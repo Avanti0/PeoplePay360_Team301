@@ -7,6 +7,7 @@ import { useToast } from '../../context/ToastContext';
 import { StatusBadge } from '../../components/common/StatusBadge';
 import { Modal } from '../../components/common/Modal';
 import { ALLOWED_PAGE_LIMITS, parsePage, parseLimit, getPageNumbers } from '../../utils/pagination';
+import { validatePhone, validateIfsc, validateEmail } from '../../utils/validation';
 import {
   Users,
   LayoutGrid,
@@ -169,23 +170,21 @@ export const EmployeesPage: React.FC = () => {
     }
 
     const cleanEmail = formData.email.trim();
-    if (!cleanEmail) {
-      errors.email = 'Email address is required';
-    } else if (!/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(cleanEmail)) {
-      errors.email = 'Please enter a valid email address';
+    const emailErr = validateEmail(cleanEmail);
+    if (emailErr) {
+      errors.email = emailErr;
     }
 
     const cleanPhone = formData.phone.trim();
-    if (cleanPhone) {
-      const digits = cleanPhone.replace(/[^0-9]/g, '');
-      if (digits.length < 7 || digits.length > 15) {
-        errors.phone = 'Phone number must be between 7 and 15 digits';
-      }
+    const phoneErr = validatePhone(cleanPhone, false);
+    if (phoneErr) {
+      errors.phone = phoneErr;
     }
 
     const cleanIfsc = formData.bankIfsc.trim().toUpperCase();
-    if (cleanIfsc && !/^[A-Z0-9]{4,11}$/.test(cleanIfsc)) {
-      errors.bankIfsc = 'IFSC code must be between 4 and 11 alphanumeric characters';
+    const ifscErr = validateIfsc(cleanIfsc);
+    if (ifscErr) {
+      errors.bankIfsc = ifscErr;
     }
 
     if (Object.keys(errors).length > 0) {
@@ -561,6 +560,12 @@ export const EmployeesPage: React.FC = () => {
                 onChange={(e) => {
                   setFormData({ ...formData, phone: e.target.value });
                   if (formErrors.phone) setFormErrors({ ...formErrors, phone: '' });
+                }}
+                onBlur={() => {
+                  const phoneErr = validatePhone(formData.phone, false);
+                  if (phoneErr) {
+                    setFormErrors((prev) => ({ ...prev, phone: phoneErr }));
+                  }
                 }}
                 placeholder="+91 98765 00000"
                 className={`w-full px-3 py-2 text-xs rounded-xl border ${

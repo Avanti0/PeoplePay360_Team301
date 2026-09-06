@@ -142,3 +142,28 @@ def test_dashboard_kpis_derived_from_live_data(db: Session):
     departments = [d["department"] for d in dept_costs]
     assert "Engineering" in departments or "Human Resources" in departments
 
+
+def test_employee_phone_validation():
+    """Verify phone validation accepts valid phone numbers and rejects invalid ones."""
+    from app.schemas.employee import EmployeeCreate
+    import pydantic
+
+    # Valid phone formats
+    emp_valid_1 = EmployeeCreate(name="Test User", email="test1@demo.com", phone="+91 9876543210")
+    assert emp_valid_1.phone == "+91 9876543210"
+
+    emp_valid_2 = EmployeeCreate(name="Test User", email="test2@demo.com", phone="9876543210")
+    assert emp_valid_2.phone == "9876543210"
+
+    emp_valid_none = EmployeeCreate(name="Test User", email="test3@demo.com", phone=None)
+    assert emp_valid_none.phone is None
+
+    # Invalid phone numbers (too short)
+    with pytest.raises(pydantic.ValidationError):
+        EmployeeCreate(name="Test User", email="test4@demo.com", phone="123")
+
+    # Invalid phone numbers (non-numeric garbage)
+    with pytest.raises(pydantic.ValidationError):
+        EmployeeCreate(name="Test User", email="test5@demo.com", phone="invalid-phone-xyz")
+
+

@@ -1,14 +1,29 @@
+import re
 from datetime import datetime
 from enum import Enum
 from typing import List, Optional
 from uuid import UUID
-from pydantic import BaseModel, EmailStr, ConfigDict
+from pydantic import BaseModel, EmailStr, ConfigDict, field_validator
 
 
 class EmploymentStatus(str, Enum):
     active   = "active"
     inactive = "inactive"
     on_leave = "on_leave"
+
+
+def validate_phone_number(v: Optional[str]) -> Optional[str]:
+    if v is None:
+        return None
+    clean = v.strip()
+    if not clean:
+        return None
+    if not re.match(r"^\+?[0-9\s\-().]{7,20}$", clean):
+        raise ValueError("Please enter a valid phone number (e.g. +91 9876543210 or 9876543210)")
+    digits = re.sub(r"[^0-9]", "", clean)
+    if len(digits) < 7 or len(digits) > 15:
+        raise ValueError("Phone number must contain between 7 and 15 digits")
+    return clean
 
 
 class EmployeeCreate(BaseModel):
@@ -25,6 +40,11 @@ class EmployeeCreate(BaseModel):
     bank_name: Optional[str] = None
     bank_ifsc: Optional[str] = None
 
+    @field_validator("phone")
+    @classmethod
+    def check_phone(cls, v: Optional[str]) -> Optional[str]:
+        return validate_phone_number(v)
+
 
 class EmployeeUpdate(BaseModel):
     name: Optional[str] = None
@@ -38,6 +58,11 @@ class EmployeeUpdate(BaseModel):
     bank_account_number: Optional[str] = None
     bank_name: Optional[str] = None
     bank_ifsc: Optional[str] = None
+
+    @field_validator("phone")
+    @classmethod
+    def check_phone(cls, v: Optional[str]) -> Optional[str]:
+        return validate_phone_number(v)
 
 
 class EmployeeOut(BaseModel):
