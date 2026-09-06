@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { api } from '../../services/api';
 import { AttendanceRecord, Employee, AttendanceStatus } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { StatusBadge } from '../../components/common/StatusBadge';
 import { Modal } from '../../components/common/Modal';
+import { ALLOWED_PAGE_LIMITS, parsePage, parseLimit, getPageNumbers } from '../../utils/pagination';
+import { parseMonthKey, monthRange, shiftMonth, formatMonthLabel, isCurrentMonth } from '../../utils/month';
 import {
   Clock,
   Search,
@@ -17,18 +20,37 @@ import {
   UserCheck,
   LogIn,
   LogOut,
+  RefreshCw,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 
 export const AttendancePage: React.FC = () => {
   const { hasRole, user } = useAuth();
   const { success, error } = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const isHR = hasRole('hr_manager');
   const currentEmployeeId = user?.employeeId;
   const currentEmployeeName = user?.employeeName || user?.username || 'Employee';
   const currentDepartment = user?.department || 'General';
 
+  // URL query params (page/limit/month) are the source of truth for
+  // pagination state, consistent with the Employees list. The attendance
+  // log is kept to one calendar month at a time, like a monthly statement,
+  // rather than an ever-growing unbounded history.
+  const page = parsePage(searchParams.get('page'));
+  const limit = parseLimit(searchParams.get('limit'));
+  const month = parseMonthKey(searchParams.get('month'));
+  const { dateFrom, dateTo } = monthRange(month);
+
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  // Today's record for the self-service clock-in/out widget — fetched
+  // independently of the paginated log table so the widget stays correct
+  // no matter which page of history is currently being browsed.
+  const [todayRecord, setTodayRecord] = useState<AttendanceRecord | null>(null);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -50,44 +72,89 @@ export const AttendancePage: React.FC = () => {
   const [punchNote, setPunchNote] = useState<string>('');
 
   useEffect(() => {
-    loadAttendance();
+    loadEmployeesForHR();
+    loadTodayStatus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
-  const loadAttendance = async () => {
-    setIsLoading(true);
+  useEffect(() => {
+    loadAttendance();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, limit, month, user]);
+
+  const loadEmployeesForHR = async () => {
+    if (!isHR) return;
     try {
-      const [attRes, empRes] = await Promise.allSettled([
-        api.attendance.getAll(),
-        isHR ? api.employees.getAll() : Promise.resolve([]),
-      ]);
-      const attData = attRes.status === 'fulfilled' ? attRes.value : [];
-      const empData = empRes.status === 'fulfilled' ? empRes.value : [];
-      setRecords(attData);
+      const empData = await api.employees.getAll();
       setEmployees(empData);
       if (empData.length > 0) {
         setPunchEmployeeId((prev) => prev || String(empData[0].id));
       }
     } catch {
+      // Employee dropdown is only needed for the HR punch modal; the main
+      // log table below already surfaces a toast on its own load failure.
+    }
+  };
+
+  // The self-service clock-in/out widget always reflects *today*,
+  // independent of whichever page of history is currently being browsed
+  // in the paginated log table below.
+  const loadTodayStatus = async () => {
+    if (isHR) return;
+    try {
+      const todayStr = new Date().toISOString().slice(0, 10);
+      const result = await api.attendance.list({ page: 1, limit: 10, dateFrom: todayStr, dateTo: todayStr });
+      setTodayRecord(result.items[0] || null);
+    } catch {
+      setTodayRecord(null);
+    }
+  };
+
+  const loadAttendance = async () => {
+    setIsLoading(true);
+    try {
+      const result = await api.attendance.list({ page, limit, dateFrom, dateTo });
+      setRecords(result.items);
+      setTotal(result.total);
+      setTotalPages(result.totalPages);
+    } catch {
       error('Failed to load attendance logs');
+      setRecords([]);
+      setTotal(0);
+      setTotalPages(1);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Determine today's record for self-service employee
-  const todayStr = new Date().toISOString().slice(0, 10);
-  const employeeRecords = !isHR && currentEmployeeId
-    ? records.filter((r) => String(r.employeeId) === String(currentEmployeeId))
-    : records;
+  const updateParams = (updates: Record<string, string>) => {
+    const next = new URLSearchParams(searchParams);
+    Object.entries(updates).forEach(([key, value]) => {
+      if (value) next.set(key, value);
+      else next.delete(key);
+    });
+    setSearchParams(next);
+  };
 
-  const todayRecord = employeeRecords.find(
-    (r) => r.checkIn && r.checkIn.slice(0, 10) === todayStr
-  );
+  const handleLimitChange = (newLimit: number) => {
+    updateParams({ limit: String(newLimit), page: '1' });
+  };
+
+  const handleMonthChange = (newMonth: string) => {
+    updateParams({ month: newMonth, page: '1' });
+  };
+
+  const goToPage = (targetPage: number) => {
+    const clamped = Math.min(Math.max(1, targetPage), totalPages);
+    updateParams({ page: String(clamped) });
+  };
 
   const isCheckedIn = !!(todayRecord && !todayRecord.checkOut);
   const isShiftCompleted = !!(todayRecord && todayRecord.checkOut);
 
-  const filteredRecords = employeeRecords.filter((r) => {
+  // Search/status remain client-side refinements over the currently loaded
+  // page — the same trade-off already accepted for the Employees list.
+  const filteredRecords = records.filter((r) => {
     const nameMatch = (r.employeeName || '').toLowerCase().includes(searchQuery.toLowerCase());
     const noteMatch = (r.note || '').toLowerCase().includes(searchQuery.toLowerCase());
     const matchesSearch = isHR ? nameMatch : (nameMatch || noteMatch);
@@ -204,6 +271,7 @@ export const AttendancePage: React.FC = () => {
       setIsPunchModalOpen(false);
       setPunchNote('');
       loadAttendance();
+      loadTodayStatus();
     } catch (err: any) {
       error(err.message || 'Error logging attendance punch');
     } finally {
@@ -341,6 +409,37 @@ export const AttendancePage: React.FC = () => {
         </div>
       )}
 
+      {/* Month Navigator — the attendance log is browsed one calendar month at a time */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-sm flex items-center justify-between gap-3">
+        <button
+          onClick={() => handleMonthChange(shiftMonth(month, -1))}
+          className="p-2 rounded-xl text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors"
+          aria-label="Previous month"
+        >
+          <ChevronLeft className="w-4 h-4" />
+        </button>
+
+        <div className="flex items-center gap-2">
+          <Calendar className="w-4 h-4 text-blue-600" />
+          <span className="text-sm font-bold text-slate-900">{formatMonthLabel(month)}</span>
+          <input
+            type="month"
+            value={month}
+            onChange={(e) => e.target.value && handleMonthChange(e.target.value)}
+            className="ml-1 px-2 py-1 text-[11px] rounded-lg border border-slate-200 text-slate-500 focus:ring-2 focus:ring-blue-500 outline-none"
+          />
+        </div>
+
+        <button
+          onClick={() => handleMonthChange(shiftMonth(month, 1))}
+          disabled={isCurrentMonth(month)}
+          className="p-2 rounded-xl text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+          aria-label="Next month"
+        >
+          <ChevronRight className="w-4 h-4" />
+        </button>
+      </div>
+
       {/* Filter Bar */}
       <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-sm flex flex-col md:flex-row gap-4 items-center justify-between">
         <div className="relative w-full md:w-80">
@@ -366,10 +465,31 @@ export const AttendancePage: React.FC = () => {
             <option value="overtime">Overtime</option>
             <option value="absent">Missing Punch / Absent</option>
           </select>
+
+          <select
+            value={limit}
+            onChange={(e) => handleLimitChange(Number(e.target.value))}
+            className="px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
+          >
+            {ALLOWED_PAGE_LIMITS.map((l) => (
+              <option key={l} value={l}>
+                {l} / page
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 
+      {/* Loading State */}
+      {isLoading && (
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-12 shadow-sm flex flex-col items-center justify-center gap-2 text-slate-400">
+          <RefreshCw className="w-6 h-6 animate-spin text-blue-600" />
+          <span className="text-xs font-medium">Loading attendance...</span>
+        </div>
+      )}
+
       {/* Attendance Records Table */}
+      {!isLoading && (
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-xs">
@@ -389,7 +509,7 @@ export const AttendancePage: React.FC = () => {
               {filteredRecords.length === 0 ? (
                 <tr>
                   <td colSpan={isHR ? 8 : 6} className="py-8 text-center text-slate-400 font-medium">
-                    No attendance records found.
+                    No attendance records found for {formatMonthLabel(month)}.
                   </td>
                 </tr>
               ) : (
@@ -484,6 +604,44 @@ export const AttendancePage: React.FC = () => {
           </table>
         </div>
       </div>
+      )}
+
+      {/* Pagination Controls */}
+      {!isLoading && total > 0 && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white rounded-2xl border border-slate-200/80 p-4 shadow-sm">
+          <p className="text-xs text-slate-500">
+            Showing {(page - 1) * limit + 1}-{Math.min(page * limit, total)} of {total} attendance records for{' '}
+            {formatMonthLabel(month)}
+          </p>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => goToPage(page - 1)}
+              disabled={page <= 1}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-slate-300 text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 transition-colors"
+            >
+              Previous
+            </button>
+            {getPageNumbers(page, totalPages).map((p) => (
+              <button
+                key={p}
+                onClick={() => goToPage(p)}
+                className={`w-8 h-8 rounded-lg text-xs font-bold transition-all ${
+                  p === page ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                {p}
+              </button>
+            ))}
+            <button
+              onClick={() => goToPage(page + 1)}
+              disabled={page >= totalPages}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-slate-300 text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 transition-colors"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Manual Correction Modal (HR Manager+ Only) */}
       {isHR && (

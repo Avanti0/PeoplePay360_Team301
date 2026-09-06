@@ -33,7 +33,9 @@ def list_attendance(
     employee_id: Optional[UUID] = None,
     date_from: Optional[date] = None,
     date_to: Optional[date] = None,
-) -> list[Attendance]:
+    page: Optional[int] = None,
+    limit: Optional[int] = None,
+):
     query = _with_employee_schedule(db.query(Attendance))
     if employee_id is not None:
         query = query.filter(Attendance.employee_id == employee_id)
@@ -43,7 +45,23 @@ def list_attendance(
         query = query.filter(func.date(Attendance.check_in) >= date_from)
     if date_to is not None:
         query = query.filter(func.date(Attendance.check_in) <= date_to)
-    return query.order_by(Attendance.check_in.desc()).all()
+
+    # Lexicographic-by-employee ordering, consistent with the Employees list;
+    # most-recent-first within the same employee as a tiebreak.
+    query = query.join(Employee, Attendance.employee_id == Employee.id).order_by(
+        Employee.name, Attendance.check_in.desc()
+    )
+
+    if limit is None:
+        # Unpaginated callers (e.g. GET /employees/{id}/attendance) keep the
+        # original plain-list contract.
+        return query.all()
+
+    total = query.count()
+    page = max(1, page or 1)
+    total_pages = max(1, -(-total // limit))  # ceiling division
+    items = query.offset((page - 1) * limit).limit(limit).all()
+    return {"items": items, "total": total, "page": page, "limit": limit, "total_pages": total_pages}
 
 
 def get_attendance(db: Session, attendance_id: UUID) -> Attendance:

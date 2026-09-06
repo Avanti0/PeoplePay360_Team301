@@ -172,6 +172,6 @@ def test_employee_attendance_list_strictly_scoped_to_self(db: Session):
 
     # User A attempts to query Employee B's records
     results = router_list_attendance(employee_id=emp_b.id, db=db, current_user=user_a)
-    for rec in results:
+    for rec in results["items"]:
         # Every returned record must strictly belong to User A's employee
         assert rec.employee_id == emp_a.id

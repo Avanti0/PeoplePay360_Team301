@@ -115,6 +115,30 @@ export interface EmployeePage {
   totalPages: number;
 }
 
+export interface AttendancePage {
+  items: AttendanceRecord[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface AllocationPage {
+  items: Allocation[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+export interface TimeOffRequestPage {
+  items: TimeOffRequest[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
 export interface Contract {
   id: string;
   employeeId: string;

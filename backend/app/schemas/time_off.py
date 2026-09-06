@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from decimal import Decimal
 from enum import Enum
-from typing import Optional
+from typing import List, Optional
 from uuid import UUID
 from pydantic import BaseModel, ConfigDict, field_validator
 
@@ -102,6 +102,14 @@ class AllocationOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class AllocationPage(BaseModel):
+    items: List[AllocationOut]
+    total: int
+    page: int
+    limit: int
+    total_pages: int
+
+
 # --- Time Off Requests ---
 
 class TimeOffRequestCreate(BaseModel):
@@ -149,3 +157,11 @@ class TimeOffRequestOut(BaseModel):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class TimeOffRequestPage(BaseModel):
+    items: List[TimeOffRequestOut]
+    total: int
+    page: int
+    limit: int
+    total_pages: int

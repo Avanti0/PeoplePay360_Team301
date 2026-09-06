@@ -7,28 +7,37 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.core.dependencies import get_current_user, require_hr_manager, require_admin, is_hr_manager_or_above, current_employee_id
 from app.models.user import User
-from app.schemas.attendance import AttendanceCreate, AttendanceUpdate, AttendanceOut
+from app.schemas.attendance import AttendanceCreate, AttendanceUpdate, AttendanceOut, AttendancePage
 from app.services import attendance_service
 
 router = APIRouter(prefix="/api/v1/attendance", tags=["attendance"])
 
+ALLOWED_LIMITS = {10, 25, 50, 100}
+DEFAULT_LIMIT = 10
 
-@router.get("", response_model=List[AttendanceOut])
+
+@router.get("", response_model=AttendancePage)
 def list_attendance(
     employee_id: Optional[UUID] = Query(None),
     date_from: Optional[date] = Query(None),
     date_to: Optional[date] = Query(None),
+    page: int = 1,
+    limit: int = DEFAULT_LIMIT,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     if not is_hr_manager_or_above(current_user):
         emp_id = current_employee_id(current_user)
         if not emp_id:
-            return []
+            return {"items": [], "total": 0, "page": 1, "limit": DEFAULT_LIMIT, "total_pages": 1}
         employee_id = emp_id
     clean_date_from = date_from if isinstance(date_from, date) else None
     clean_date_to = date_to if isinstance(date_to, date) else None
-    return attendance_service.list_attendance(db, employee_id=employee_id, date_from=clean_date_from, date_to=clean_date_to)
+    if limit not in ALLOWED_LIMITS:
+        limit = DEFAULT_LIMIT
+    return attendance_service.list_attendance(
+        db, employee_id=employee_id, date_from=clean_date_from, date_to=clean_date_to, page=page, limit=limit
+    )
 
 
 @router.post("", response_model=AttendanceOut)

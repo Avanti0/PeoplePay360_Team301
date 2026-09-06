@@ -5,6 +5,7 @@ import { Employee, Contract, AttendanceRecord, TimeOffRequest, WorkingSchedule }
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { StatusBadge } from '../../components/common/StatusBadge';
+import { currentMonthKey, monthRange, shiftMonth, formatMonthLabel, isCurrentMonth } from '../../utils/month';
 import {
   User,
   ArrowLeft,
@@ -20,6 +21,8 @@ import {
   UserCheck,
   ShieldAlert,
   CalendarDays,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -39,6 +42,9 @@ export const EmployeeDetailPage: React.FC = () => {
   const [schedule, setSchedule] = useState<WorkingSchedule | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'contracts' | 'attendance' | 'timeOff'>('overview');
   const [isLoading, setIsLoading] = useState(true);
+  // The attendance tab is kept to one calendar month at a time, like a
+  // monthly statement, rather than an ever-growing unbounded history.
+  const [attMonth, setAttMonth] = useState(currentMonthKey());
 
   useEffect(() => {
     if (id) {
@@ -51,23 +57,32 @@ export const EmployeeDetailPage: React.FC = () => {
     }
   }, [id, user]);
 
+  useEffect(() => {
+    if (id) {
+      loadAttendanceForMonth(id, attMonth);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, attMonth]);
+
+  const loadAttendanceForMonth = async (empId: string, monthKey: string) => {
+    try {
+      const { dateFrom, dateTo } = monthRange(monthKey);
+      setAttendance(await api.employees.getAttendance(empId, { dateFrom, dateTo }));
+    } catch {
+      setAttendance([]);
+    }
+  };
+
   const loadEmployeeDetails = async (empId: string) => {
     setIsLoading(true);
     try {
-      if (!isHR && user?.employeeId && String(empId) !== String(user.employeeId)) {
-        error('Access denied: You can only view your own employee profile');
-        navigate('/dashboard');
-        return;
-      }
-      const [emp, contractList, attList, toList] = await Promise.all([
+      const [emp, contractList, toList] = await Promise.all([
         api.employees.getById(empId),
         isHR ? api.employees.getContracts(empId).catch(() => []) : Promise.resolve([]),
-        api.employees.getAttendance(empId).catch(() => []),
         api.employees.getTimeOff(empId).catch(() => []),
       ]);
       setEmployee(emp);
       setContracts(contractList);
-      setAttendance(attList);
       setTimeOff(toList);
 
       // The assigned working schedule is fetched separately, reusing the
@@ -410,6 +425,26 @@ export const EmployeeDetailPage: React.FC = () => {
         <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
           <div className="p-4 border-b border-slate-100 flex items-center justify-between">
             <h3 className="text-sm font-bold text-slate-900">Attendance Log History</h3>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setAttMonth(shiftMonth(attMonth, -1))}
+                className="p-1.5 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors"
+                aria-label="Previous month"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <span className="text-xs font-bold text-slate-700 min-w-[110px] text-center">
+                {formatMonthLabel(attMonth)}
+              </span>
+              <button
+                onClick={() => setAttMonth(shiftMonth(attMonth, 1))}
+                disabled={isCurrentMonth(attMonth)}
+                className="p-1.5 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                aria-label="Next month"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
@@ -427,7 +462,7 @@ export const EmployeeDetailPage: React.FC = () => {
                 {attendance.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="py-4 text-center text-slate-400">
-                      No attendance records logged yet.
+                      No attendance records logged for {formatMonthLabel(attMonth)}.
                     </td>
                   </tr>
                 ) : (

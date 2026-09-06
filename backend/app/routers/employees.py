@@ -1,3 +1,4 @@
+from datetime import date
 from typing import List, Optional
 from uuid import UUID
 from fastapi import APIRouter, Depends, Query
@@ -24,8 +25,8 @@ def list_employees(
     employment_status: Optional[EmploymentStatus] = Query(None),
     status: Optional[str] = Query(None, description="active | inactive | all (alias used by frontend)"),
     search: Optional[str] = Query(None, description="matches employee name or email"),
-    page: int = Query(1),
-    limit: int = Query(DEFAULT_LIMIT),
+    page: int = 1,
+    limit: int = DEFAULT_LIMIT,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -85,9 +86,15 @@ def list_employee_contracts(employee_id: UUID, db: Session = Depends(get_db)):
 
 
 @router.get("/{employee_id}/attendance", response_model=List[AttendanceOut])
-def list_employee_attendance(employee_id: UUID, db: Session = Depends(get_db), _=Depends(require_hr_manager_or_self)):
+def list_employee_attendance(
+    employee_id: UUID,
+    date_from: Optional[date] = Query(None),
+    date_to: Optional[date] = Query(None),
+    db: Session = Depends(get_db),
+    _=Depends(require_hr_manager_or_self),
+):
     employee_service.get_employee(db, employee_id)  # 404 if the employee doesn't exist
-    return attendance_service.list_attendance(db, employee_id=employee_id)
+    return attendance_service.list_attendance(db, employee_id=employee_id, date_from=date_from, date_to=date_to)
 
 
 @router.get("/{employee_id}/time-off", response_model=List[TimeOffRequestOut])

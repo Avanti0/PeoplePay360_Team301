@@ -5,9 +5,12 @@ import {
   Contract,
   WorkingSchedule,
   AttendanceRecord,
+  AttendancePage,
   TimeOffType,
   Allocation,
+  AllocationPage,
   TimeOffRequest,
+  TimeOffRequestPage,
   SalaryStructure,
   SalaryRule,
   Payrun,
@@ -531,7 +534,8 @@ function handleMockRoutes(endpoint: string, method: string, body: any): any {
   }
 
   if (endpoint.startsWith('/employees/') && method === 'GET') {
-    const parts = endpoint.split('?')[0].split('/');
+    const [path, qs] = endpoint.split('?');
+    const parts = path.split('/');
     const id = parts[2];
     const sub = parts[3];
 
@@ -552,7 +556,16 @@ function handleMockRoutes(endpoint: string, method: string, body: any): any {
       return contractsStore.filter((c) => String(c.employeeId) === String(id));
     }
     if (sub === 'attendance') {
-      return attendanceStore.filter((a) => String(a.employeeId) === String(id));
+      const params = new URLSearchParams(qs || '');
+      const dateFrom = params.get('date_from');
+      const dateTo = params.get('date_to');
+      return attendanceStore.filter((a) => {
+        if (String(a.employeeId) !== String(id)) return false;
+        const day = a.checkIn ? a.checkIn.slice(0, 10) : null;
+        if (dateFrom && (!day || day < dateFrom)) return false;
+        if (dateTo && (!day || day > dateTo)) return false;
+        return true;
+      });
     }
     if (sub === 'time-off') {
       return timeOffRequestsStore.filter((t) => String(t.employeeId) === String(id));
@@ -794,12 +807,39 @@ function handleMockRoutes(endpoint: string, method: string, body: any): any {
   }
 
   // Attendance
-  if (endpoint === '/attendance' && method === 'GET') {
+  if (endpoint.startsWith('/attendance') && !endpoint.startsWith('/attendance/') && method === 'GET') {
+    const ALLOWED_LIMITS = [10, 25, 50, 100];
+    const DEFAULT_LIMIT = 10;
+    const qs = endpoint.includes('?') ? endpoint.split('?')[1] : '';
+    const params = new URLSearchParams(qs);
+
+    let limit = parseInt(params.get('limit') || '', 10);
+    if (!ALLOWED_LIMITS.includes(limit)) limit = DEFAULT_LIMIT;
+    let page = parseInt(params.get('page') || '', 10);
+    if (!Number.isFinite(page) || page < 1) page = 1;
+
+    let filtered = attendanceStore;
     if (currentAuthUser && currentAuthUser.role === 'employee') {
       const userEmpId = currentAuthUser.employeeId;
-      return attendanceStore.filter((a) => !userEmpId || String(a.employeeId) === String(userEmpId));
+      filtered = filtered.filter((a) => !userEmpId || String(a.employeeId) === String(userEmpId));
     }
-    return attendanceStore;
+    const dateFrom = params.get('date_from');
+    const dateTo = params.get('date_to');
+    if (dateFrom) filtered = filtered.filter((a) => !!a.checkIn && a.checkIn.slice(0, 10) >= dateFrom);
+    if (dateTo) filtered = filtered.filter((a) => !!a.checkIn && a.checkIn.slice(0, 10) <= dateTo);
+
+    // Lexicographic-by-employee ordering, consistent with the real backend
+    // and the Employees list; most-recent-first within the same employee.
+    const sorted = filtered.slice().sort((a, b) => {
+      const nameCmp = (a.employeeName || '').localeCompare(b.employeeName || '');
+      if (nameCmp !== 0) return nameCmp;
+      return new Date(b.checkIn || 0).getTime() - new Date(a.checkIn || 0).getTime();
+    });
+
+    const total = sorted.length;
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+    const items = sorted.slice((page - 1) * limit, (page - 1) * limit + limit);
+    return { items, total, page, limit, totalPages };
   }
 
   if (endpoint === '/attendance' && method === 'POST') {
@@ -887,18 +927,40 @@ function handleMockRoutes(endpoint: string, method: string, body: any): any {
   }
 
   // Allocations
-  if ((endpoint === '/allocations' || endpoint.startsWith('/allocations?')) && method === 'GET') {
-    if (currentAuthUser && currentAuthUser.role === 'employee') {
-      const userEmpId = currentAuthUser.employeeId;
-      return allocationsStore.filter((al) => !userEmpId || String(al.employeeId) === String(userEmpId));
-    }
+  if (endpoint.startsWith('/allocations') && !endpoint.startsWith('/allocations/') && method === 'GET') {
+    const ALLOWED_LIMITS = [10, 25, 50, 100];
+    const DEFAULT_LIMIT = 10;
     const qs = endpoint.includes('?') ? endpoint.split('?')[1] : '';
     const params = new URLSearchParams(qs);
-    const empParam = params.get('employee_id');
-    if (empParam) {
-      return allocationsStore.filter((al) => String(al.employeeId) === String(empParam));
+
+    let limit = parseInt(params.get('limit') || '', 10);
+    if (!ALLOWED_LIMITS.includes(limit)) limit = DEFAULT_LIMIT;
+    let page = parseInt(params.get('page') || '', 10);
+    if (!Number.isFinite(page) || page < 1) page = 1;
+
+    let filtered = allocationsStore;
+    if (currentAuthUser && currentAuthUser.role === 'employee') {
+      // Self-service employees only ever see their own allocations —
+      // an explicit employee_id param can't be used to bypass that.
+      const userEmpId = currentAuthUser.employeeId;
+      filtered = filtered.filter((a) => !userEmpId || String(a.employeeId) === String(userEmpId));
+    } else {
+      const empParam = params.get('employee_id');
+      if (empParam) {
+        filtered = filtered.filter((a) => String(a.employeeId) === String(empParam));
+      }
     }
-    return allocationsStore;
+
+    const sorted = filtered.slice().sort((a, b) => {
+      const nameCmp = (a.employeeName || '').localeCompare(b.employeeName || '');
+      if (nameCmp !== 0) return nameCmp;
+      return new Date(b.dateFrom || 0).getTime() - new Date(a.dateFrom || 0).getTime();
+    });
+
+    const total = sorted.length;
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+    const items = sorted.slice((page - 1) * limit, (page - 1) * limit + limit);
+    return { items, total, page, limit, totalPages };
   }
 
   if (endpoint.startsWith('/allocations/') && method === 'GET') {
@@ -941,19 +1003,40 @@ function handleMockRoutes(endpoint: string, method: string, body: any): any {
   }
 
   // Time Off Requests
-  if ((endpoint === '/time-off-requests' || endpoint.startsWith('/time-off-requests?')) && method === 'GET') {
-    if (currentAuthUser && currentAuthUser.role === 'employee') {
-      const userEmpId = currentAuthUser.employeeId;
-      return timeOffRequestsStore.filter((r) => !userEmpId || String(r.employeeId) === String(userEmpId));
-    }
+  if (endpoint.startsWith('/time-off-requests') && !endpoint.startsWith('/time-off-requests/') && method === 'GET') {
+    const ALLOWED_LIMITS = [10, 25, 50, 100];
+    const DEFAULT_LIMIT = 10;
     const qs = endpoint.includes('?') ? endpoint.split('?')[1] : '';
     const params = new URLSearchParams(qs);
-    const empParam = params.get('employee_id');
+
+    let limit = parseInt(params.get('limit') || '', 10);
+    if (!ALLOWED_LIMITS.includes(limit)) limit = DEFAULT_LIMIT;
+    let page = parseInt(params.get('page') || '', 10);
+    if (!Number.isFinite(page) || page < 1) page = 1;
     const statusParam = params.get('status');
-    let res = timeOffRequestsStore;
-    if (empParam) res = res.filter((r) => String(r.employeeId) === String(empParam));
-    if (statusParam) res = res.filter((r) => r.status === statusParam);
-    return res;
+
+    let filtered = timeOffRequestsStore;
+    if (currentAuthUser && currentAuthUser.role === 'employee') {
+      // Self-service employees only ever see their own requests — an
+      // explicit employee_id param can't be used to bypass that.
+      const userEmpId = currentAuthUser.employeeId;
+      filtered = filtered.filter((r) => !userEmpId || String(r.employeeId) === String(userEmpId));
+    } else {
+      const empParam = params.get('employee_id');
+      if (empParam) filtered = filtered.filter((r) => String(r.employeeId) === String(empParam));
+    }
+    if (statusParam) filtered = filtered.filter((r) => r.status === statusParam);
+
+    const sorted = filtered.slice().sort((a, b) => {
+      const nameCmp = (a.employeeName || '').localeCompare(b.employeeName || '');
+      if (nameCmp !== 0) return nameCmp;
+      return new Date(b.dateFrom || 0).getTime() - new Date(a.dateFrom || 0).getTime();
+    });
+
+    const total = sorted.length;
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+    const items = sorted.slice((page - 1) * limit, (page - 1) * limit + limit);
+    return { items, total, page, limit, totalPages };
   }
 
   if (endpoint.startsWith('/time-off-requests/') && !endpoint.includes('/approve') && !endpoint.includes('/refuse') && method === 'GET') {
@@ -1319,8 +1402,13 @@ export const api = {
       }),
     getContracts: (id: string | number) =>
       request<Contract[]>(`/employees/${id}/contracts`),
-    getAttendance: (id: string | number) =>
-      request<AttendanceRecord[]>(`/employees/${id}/attendance`),
+    getAttendance: (id: string | number, params: { dateFrom?: string; dateTo?: string } = {}) => {
+      const query = new URLSearchParams();
+      if (params.dateFrom) query.set('date_from', params.dateFrom);
+      if (params.dateTo) query.set('date_to', params.dateTo);
+      const qs = query.toString();
+      return request<AttendanceRecord[]>(`/employees/${id}/attendance${qs ? `?${qs}` : ''}`);
+    },
     getTimeOff: (id: string | number) =>
       request<TimeOffRequest[]>(`/employees/${id}/time-off`),
   },
@@ -1376,7 +1464,16 @@ export const api = {
   },
 
   attendance: {
-    getAll: () => request<AttendanceRecord[]>('/attendance'),
+    // Server-side paginated + ordered (lexicographic by employee, then
+    // most-recent-first) list, used by the Attendance Logs page.
+    list: (params: { page?: number; limit?: number; dateFrom?: string; dateTo?: string } = {}) => {
+      const query = new URLSearchParams();
+      if (params.dateFrom) query.set('date_from', params.dateFrom);
+      if (params.dateTo) query.set('date_to', params.dateTo);
+      query.set('page', String(params.page ?? 1));
+      query.set('limit', String(params.limit ?? 10));
+      return request<AttendancePage>(`/attendance?${query.toString()}`);
+    },
     create: (data: Partial<AttendanceRecord>) =>
       request<AttendanceRecord>('/attendance', {
         method: 'POST',
@@ -1399,7 +1496,27 @@ export const api = {
   },
 
   allocations: {
-    getAll: () => request<Allocation[]>('/allocations'),
+    // Server-side paginated + ordered (lexicographic by employee) list,
+    // used by the Time Off page's Allocations tab.
+    list: (params: { page?: number; limit?: number } = {}) => {
+      const query = new URLSearchParams();
+      query.set('page', String(params.page ?? 1));
+      query.set('limit', String(params.limit ?? 10));
+      return request<AllocationPage>(`/allocations?${query.toString()}`);
+    },
+    // Full allocation roster, needed by the leave-request form to validate
+    // balance against *any* employee's allocation, not just whichever page
+    // the Allocations tab happens to be showing. Pages through the
+    // paginated endpoint rather than an unbounded backend query.
+    getAll: async (): Promise<Allocation[]> => {
+      const first = await api.allocations.list({ page: 1, limit: 100 });
+      const all = [...first.items];
+      for (let page = 2; page <= first.totalPages; page++) {
+        const next = await api.allocations.list({ page, limit: 100 });
+        all.push(...next.items);
+      }
+      return all;
+    },
     create: (data: Partial<Allocation>) =>
       request<Allocation>('/allocations', {
         method: 'POST',
@@ -1413,7 +1530,14 @@ export const api = {
   },
 
   timeOffRequests: {
-    getAll: () => request<TimeOffRequest[]>('/time-off-requests'),
+    // Server-side paginated + ordered (lexicographic by employee) list,
+    // used by the Time Off page's Requests tab.
+    list: (params: { page?: number; limit?: number } = {}) => {
+      const query = new URLSearchParams();
+      query.set('page', String(params.page ?? 1));
+      query.set('limit', String(params.limit ?? 10));
+      return request<TimeOffRequestPage>(`/time-off-requests?${query.toString()}`);
+    },
     create: (data: Partial<TimeOffRequest>) =>
       request<TimeOffRequest>('/time-off-requests', {
         method: 'POST',

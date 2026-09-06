@@ -1,7 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 from enum import Enum
-from typing import Optional
+from typing import List, Optional
 from uuid import UUID
 from pydantic import BaseModel, ConfigDict
 
@@ -43,3 +43,11 @@ class AttendanceOut(BaseModel):
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class AttendancePage(BaseModel):
+    items: List[AttendanceOut]
+    total: int
+    page: int
+    limit: int
+    total_pages: int

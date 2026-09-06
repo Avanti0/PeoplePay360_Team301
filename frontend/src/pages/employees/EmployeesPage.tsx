@@ -6,6 +6,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { StatusBadge } from '../../components/common/StatusBadge';
 import { Modal } from '../../components/common/Modal';
+import { ALLOWED_PAGE_LIMITS, parsePage, parseLimit, getPageNumbers } from '../../utils/pagination';
 import {
   Users,
   LayoutGrid,
@@ -21,32 +22,11 @@ import {
   RefreshCw,
 } from 'lucide-react';
 
-const ALLOWED_LIMITS = [10, 25, 50, 100];
-const DEFAULT_LIMIT = 10;
 const ALLOWED_STATUSES = ['active', 'inactive', 'all'];
 const DEFAULT_STATUS = 'active';
 
-function parsePage(raw: string | null): number {
-  const n = parseInt(raw ?? '', 10);
-  return Number.isFinite(n) && n >= 1 ? n : 1;
-}
-
-function parseLimit(raw: string | null): number {
-  const n = parseInt(raw ?? '', 10);
-  return ALLOWED_LIMITS.includes(n) ? n : DEFAULT_LIMIT;
-}
-
 function parseStatus(raw: string | null): string {
   return raw && ALLOWED_STATUSES.includes(raw) ? raw : DEFAULT_STATUS;
-}
-
-function getPageNumbers(current: number, total: number): number[] {
-  const maxButtons = 5;
-  if (total <= maxButtons) return Array.from({ length: total }, (_, i) => i + 1);
-  let start = Math.max(1, current - 2);
-  const end = Math.min(total, start + maxButtons - 1);
-  start = Math.max(1, end - maxButtons + 1);
-  return Array.from({ length: end - start + 1 }, (_, i) => start + i);
 }
 
 export const EmployeesPage: React.FC = () => {
@@ -342,7 +322,7 @@ export const EmployeesPage: React.FC = () => {
             onChange={(e) => handleLimitChange(Number(e.target.value))}
             className="px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
           >
-            {ALLOWED_LIMITS.map((l) => (
+            {ALLOWED_PAGE_LIMITS.map((l) => (
               <option key={l} value={l}>
                 {l} / page
               </option>

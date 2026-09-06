@@ -6,7 +6,8 @@ import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { StatusBadge } from '../../components/common/StatusBadge';
 import { Modal } from '../../components/common/Modal';
-import { CalendarCheck, Plus, Check, X, Layers, PieChart, UserCheck } from 'lucide-react';
+import { ALLOWED_PAGE_LIMITS, parsePage, parseLimit, getPageNumbers } from '../../utils/pagination';
+import { CalendarCheck, Plus, Check, X, Layers, PieChart, UserCheck, RefreshCw } from 'lucide-react';
 
 interface TimeOffPageProps {
   defaultTab?: 'requests' | 'allocations' | 'types';
@@ -40,18 +41,59 @@ export const TimeOffPage: React.FC<TimeOffPageProps> = ({ defaultTab }) => {
     setActiveTab(getActiveTabFromLocation());
   }, [location.pathname, searchParams, defaultTab]);
 
+  // Page/limit are shared URL params — only one tab's table is visible at a
+  // time, so switching tabs resets to page 1 rather than carrying over a
+  // page number that may not exist in the other tab's dataset.
+  const page = parsePage(searchParams.get('page'));
+  const limit = parseLimit(searchParams.get('limit'));
+
   const handleTabChange = (tab: 'requests' | 'allocations' | 'types') => {
     setActiveTab(tab);
     if (location.pathname.startsWith('/time-off/')) {
-      navigate(`/time-off/${tab}`);
+      navigate(`/time-off/${tab}?page=1&limit=${limit}`);
     } else {
-      setSearchParams({ tab });
+      const next = new URLSearchParams(searchParams);
+      next.set('tab', tab);
+      next.set('page', '1');
+      setSearchParams(next);
     }
   };
+
+  const updateParams = (updates: Record<string, string>) => {
+    const next = new URLSearchParams(searchParams);
+    Object.entries(updates).forEach(([key, value]) => {
+      if (value) next.set(key, value);
+      else next.delete(key);
+    });
+    setSearchParams(next);
+  };
+
+  const handleLimitChange = (newLimit: number) => {
+    updateParams({ limit: String(newLimit), page: '1' });
+  };
+
+  const goToPage = (targetPage: number, totalPages: number) => {
+    const clamped = Math.min(Math.max(1, targetPage), totalPages);
+    updateParams({ page: String(clamped) });
+  };
+
   const [requests, setRequests] = useState<TimeOffRequest[]>([]);
+  const [requestsTotal, setRequestsTotal] = useState(0);
+  const [requestsTotalPages, setRequestsTotalPages] = useState(1);
+
+  // Current page of allocations, for the Allocations tab's table.
   const [allocations, setAllocations] = useState<Allocation[]>([]);
+  const [allocationsTotal, setAllocationsTotal] = useState(0);
+  const [allocationsTotalPages, setAllocationsTotalPages] = useState(1);
+  // Full allocation roster (server-scoped to "own" for self-service, "all"
+  // for HR) — needed for the leave-request form's balance validation and
+  // the self-service "My Leave Balance" cards, regardless of whichever
+  // page the Allocations tab's table happens to be showing.
+  const [allAllocations, setAllAllocations] = useState<Allocation[]>([]);
+
   const [leaveTypes, setLeaveTypes] = useState<TimeOffType[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
   const [isSubmittingReq, setIsSubmittingReq] = useState(false);
@@ -73,24 +115,32 @@ export const TimeOffPage: React.FC<TimeOffPageProps> = ({ defaultTab }) => {
   const [allocTo, setAllocTo] = useState(new Date().toISOString().slice(0, 4) + '-12-31');
 
   useEffect(() => {
-    loadData();
+    loadReferenceData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
-  const loadData = async () => {
+  useEffect(() => {
+    if (activeTab === 'requests') loadRequests();
+    else if (activeTab === 'allocations') loadAllocationsPage();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, page, limit, user]);
+
+  // Reference data: full leave-type list, full allocation roster (needed for
+  // request-form validation and the self-service balance cards), and — for
+  // HR only — the full employee roster (self-service doesn't need it, since
+  // the request form uses the signed-in user's own identity directly).
+  const loadReferenceData = async () => {
     try {
-      const [reqsRes, allocsRes, typesRes, empsRes] = await Promise.allSettled([
-        api.timeOffRequests.getAll(),
+      const [allocsRes, typesRes, empsRes] = await Promise.allSettled([
         api.allocations.getAll(),
         api.timeOffTypes.getAll(),
         isHR ? api.employees.getAll() : Promise.resolve([]),
       ]);
-      const reqs = reqsRes.status === 'fulfilled' ? reqsRes.value : [];
       const allocs = allocsRes.status === 'fulfilled' ? allocsRes.value : [];
       const types = typesRes.status === 'fulfilled' ? typesRes.value : [];
       const emps = empsRes.status === 'fulfilled' ? empsRes.value : [];
 
-      setRequests(reqs);
-      setAllocations(allocs);
+      setAllAllocations(allocs);
       setLeaveTypes(types);
       setEmployees(emps);
 
@@ -103,8 +153,48 @@ export const TimeOffPage: React.FC<TimeOffPageProps> = ({ defaultTab }) => {
         setAllocTypeId((prev) => prev || String(types[0].id));
       }
     } catch {
-      error('Failed loading time off records');
+      error('Failed loading time off reference data');
     }
+  };
+
+  const loadRequests = async () => {
+    setIsLoading(true);
+    try {
+      const result = await api.timeOffRequests.list({ page, limit });
+      setRequests(result.items);
+      setRequestsTotal(result.total);
+      setRequestsTotalPages(result.totalPages);
+    } catch {
+      error('Failed loading time off requests');
+      setRequests([]);
+      setRequestsTotal(0);
+      setRequestsTotalPages(1);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const loadAllocationsPage = async () => {
+    setIsLoading(true);
+    try {
+      const result = await api.allocations.list({ page, limit });
+      setAllocations(result.items);
+      setAllocationsTotal(result.total);
+      setAllocationsTotalPages(result.totalPages);
+    } catch {
+      error('Failed loading allocations');
+      setAllocations([]);
+      setAllocationsTotal(0);
+      setAllocationsTotalPages(1);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const refreshAll = () => {
+    loadReferenceData();
+    if (activeTab === 'requests') loadRequests();
+    else if (activeTab === 'allocations') loadAllocationsPage();
   };
 
   const handleApprove = async (reqId: string | number) => {
@@ -112,7 +202,7 @@ export const TimeOffPage: React.FC<TimeOffPageProps> = ({ defaultTab }) => {
     try {
       await api.timeOffRequests.approve(reqId);
       success('Leave request approved. Allocation balance deducted automatically (FR-06).');
-      loadData();
+      refreshAll();
     } catch (err: any) {
       error(err.message || 'Failed to approve request');
     }
@@ -123,7 +213,7 @@ export const TimeOffPage: React.FC<TimeOffPageProps> = ({ defaultTab }) => {
     try {
       await api.timeOffRequests.refuse(reqId);
       warning('Leave request refused.');
-      loadData();
+      refreshAll();
     } catch (err: any) {
       error(err.message || 'Failed to refuse request');
     }
@@ -169,7 +259,7 @@ export const TimeOffPage: React.FC<TimeOffPageProps> = ({ defaultTab }) => {
       : { name: currentEmployeeName, department: currentDepartment };
 
     const lType = leaveTypes.find((t) => String(t.id) === String(reqTypeId));
-    const alloc = allocations.find(
+    const alloc = allAllocations.find(
       (a) =>
         String(a.employeeId) === String(effectiveEmployeeId) &&
         String(a.timeOffTypeId) === String(reqTypeId) &&
@@ -207,7 +297,7 @@ export const TimeOffPage: React.FC<TimeOffPageProps> = ({ defaultTab }) => {
       success('Time off request submitted.');
       setIsRequestModalOpen(false);
       setReqReason('');
-      loadData();
+      refreshAll();
     } catch (err: any) {
       error(err.message || 'Failed submitting leave request');
     } finally {
@@ -260,7 +350,7 @@ export const TimeOffPage: React.FC<TimeOffPageProps> = ({ defaultTab }) => {
       });
       success(`Granted ${allocDays} days allocation to ${emp?.name || 'employee'}`);
       setIsAllocModalOpen(false);
-      loadData();
+      refreshAll();
     } catch (err: any) {
       error(err.message || 'Error creating allocation');
     } finally {
@@ -271,6 +361,11 @@ export const TimeOffPage: React.FC<TimeOffPageProps> = ({ defaultTab }) => {
   const [requestSearchQuery, setRequestSearchQuery] = useState('');
   const [requestStatusFilter, setRequestStatusFilter] = useState('all');
 
+  // requests/allocations are already server-scoped to "own" for self-service
+  // and paginated to the current page; search/status remain client-side
+  // refinements over that page — the same trade-off already accepted for
+  // the Employees and Attendance lists. The self-filter below is a harmless
+  // no-op safety net (the backend already scopes non-HR callers).
   const visibleRequests = (isHR
     ? requests
     : requests.filter((r) => !currentEmployeeId || String(r.employeeId) === String(currentEmployeeId))
@@ -296,8 +391,15 @@ export const TimeOffPage: React.FC<TimeOffPageProps> = ({ defaultTab }) => {
     ? allocations
     : allocations.filter((a) => !currentEmployeeId || String(a.employeeId) === String(currentEmployeeId));
 
+  // Self-service "My Leave Balance" cards always show the employee's full
+  // allocation set, independent of whichever page the Allocations tab's
+  // table is currently showing.
+  const myAllocations = !isHR
+    ? allAllocations.filter((a) => !currentEmployeeId || String(a.employeeId) === String(currentEmployeeId))
+    : [];
+
   const selectedReqType = leaveTypes.find((t) => String(t.id) === String(reqTypeId));
-  const selectedReqAlloc = allocations.find(
+  const selectedReqAlloc = allAllocations.find(
     (a) =>
       String(a.employeeId) === String(isHR ? reqEmployeeId : currentEmployeeId) &&
       String(a.timeOffTypeId) === String(reqTypeId) &&
@@ -338,11 +440,11 @@ export const TimeOffPage: React.FC<TimeOffPageProps> = ({ defaultTab }) => {
       </div>
 
       {/* My Leave Balance Summary Cards for Employees */}
-      {!isHR && visibleAllocations.length > 0 && (
+      {!isHR && myAllocations.length > 0 && (
         <div className="space-y-2">
           <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">My Leave Balance</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-            {visibleAllocations.map((alloc) => {
+            {myAllocations.map((alloc) => {
               const type = leaveTypes.find((t) => String(t.id) === String(alloc.timeOffTypeId));
               const typeName = alloc.timeOffTypeName || type?.name || 'Leave';
               const percentRemaining = alloc.numberOfDays
@@ -390,7 +492,7 @@ export const TimeOffPage: React.FC<TimeOffPageProps> = ({ defaultTab }) => {
           }`}
         >
           <CalendarCheck className="w-4 h-4" />
-          <span>{isHR ? 'All Requests' : 'My Requests'} ({visibleRequests.length})</span>
+          <span>{isHR ? 'All Requests' : 'My Requests'} ({requestsTotal})</span>
         </button>
         <button
           onClick={() => handleTabChange('allocations')}
@@ -399,7 +501,7 @@ export const TimeOffPage: React.FC<TimeOffPageProps> = ({ defaultTab }) => {
           }`}
         >
           <PieChart className="w-4 h-4" />
-          <span>{isHR ? 'Balance Allocations' : 'My Leave Balances'} ({visibleAllocations.length})</span>
+          <span>{isHR ? 'Balance Allocations' : 'My Leave Balances'} ({allocationsTotal})</span>
         </button>
         <button
           onClick={() => handleTabChange('types')}
@@ -412,8 +514,31 @@ export const TimeOffPage: React.FC<TimeOffPageProps> = ({ defaultTab }) => {
         </button>
       </div>
 
+      {activeTab !== 'types' && (
+        <div className="flex items-center justify-end">
+          <select
+            value={limit}
+            onChange={(e) => handleLimitChange(Number(e.target.value))}
+            className="px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
+          >
+            {ALLOWED_PAGE_LIMITS.map((l) => (
+              <option key={l} value={l}>
+                {l} / page
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {isLoading && activeTab !== 'types' && (
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-12 shadow-sm flex flex-col items-center justify-center gap-2 text-slate-400">
+          <RefreshCw className="w-6 h-6 animate-spin text-blue-600" />
+          <span className="text-xs font-medium">Loading...</span>
+        </div>
+      )}
+
       {/* Filter Bar for Requests Tab */}
-      {activeTab === 'requests' && (
+      {!isLoading && activeTab === 'requests' && (
         <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-sm flex flex-col md:flex-row gap-4 items-center justify-between">
           <div className="w-full md:w-80">
             <input
@@ -441,7 +566,7 @@ export const TimeOffPage: React.FC<TimeOffPageProps> = ({ defaultTab }) => {
         </div>
       )}
 
-      {activeTab === 'requests' && (
+      {!isLoading && activeTab === 'requests' && (
         <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
@@ -525,7 +650,42 @@ export const TimeOffPage: React.FC<TimeOffPageProps> = ({ defaultTab }) => {
         </div>
       )}
 
-      {activeTab === 'allocations' && (
+      {!isLoading && activeTab === 'requests' && requestsTotal > 0 && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white rounded-2xl border border-slate-200/80 p-4 shadow-sm">
+          <p className="text-xs text-slate-500">
+            Showing {(page - 1) * limit + 1}-{Math.min(page * limit, requestsTotal)} of {requestsTotal} requests
+          </p>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => goToPage(page - 1, requestsTotalPages)}
+              disabled={page <= 1}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-slate-300 text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 transition-colors"
+            >
+              Previous
+            </button>
+            {getPageNumbers(page, requestsTotalPages).map((p) => (
+              <button
+                key={p}
+                onClick={() => goToPage(p, requestsTotalPages)}
+                className={`w-8 h-8 rounded-lg text-xs font-bold transition-all ${
+                  p === page ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                {p}
+              </button>
+            ))}
+            <button
+              onClick={() => goToPage(page + 1, requestsTotalPages)}
+              disabled={page >= requestsTotalPages}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-slate-300 text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 transition-colors"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
+
+      {!isLoading && activeTab === 'allocations' && (
         <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
@@ -576,6 +736,41 @@ export const TimeOffPage: React.FC<TimeOffPageProps> = ({ defaultTab }) => {
                 )}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {!isLoading && activeTab === 'allocations' && allocationsTotal > 0 && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white rounded-2xl border border-slate-200/80 p-4 shadow-sm">
+          <p className="text-xs text-slate-500">
+            Showing {(page - 1) * limit + 1}-{Math.min(page * limit, allocationsTotal)} of {allocationsTotal} allocations
+          </p>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => goToPage(page - 1, allocationsTotalPages)}
+              disabled={page <= 1}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-slate-300 text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 transition-colors"
+            >
+              Previous
+            </button>
+            {getPageNumbers(page, allocationsTotalPages).map((p) => (
+              <button
+                key={p}
+                onClick={() => goToPage(p, allocationsTotalPages)}
+                className={`w-8 h-8 rounded-lg text-xs font-bold transition-all ${
+                  p === page ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                {p}
+              </button>
+            ))}
+            <button
+              onClick={() => goToPage(page + 1, allocationsTotalPages)}
+              disabled={page >= allocationsTotalPages}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-slate-300 text-slate-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 transition-colors"
+            >
+              Next
+            </button>
           </div>
         </div>
       )}
