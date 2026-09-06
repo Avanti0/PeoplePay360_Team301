@@ -22,7 +22,6 @@ import {
   Clock,
   ArrowRight,
   ShieldAlert,
-  UserCheck,
 } from 'lucide-react';
 
 export const DashboardPage: React.FC = () => {
@@ -34,8 +33,6 @@ export const DashboardPage: React.FC = () => {
   const [salaryTrend, setSalaryTrend] = useState<MonthlySalaryTrend[]>([]);
   const [alerts, setAlerts] = useState<DashboardAlert[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [managementViewMode, setManagementViewMode] = useState<'overview' | 'personal'>('overview');
-
   const isManagement =
     hasRole('hr_manager') ||
     hasRole('hr_payroll_user') ||
@@ -44,25 +41,8 @@ export const DashboardPage: React.FC = () => {
     (user && user.role !== 'employee');
 
   // If user is a standard employee, render the dedicated Employee Dashboard directly
-  if (!isManagement || managementViewMode === 'personal') {
-    return (
-      <div className="space-y-4">
-        {isManagement && (
-          <div className="flex items-center justify-between bg-purple-50/80 border border-purple-200 px-4 py-2 rounded-2xl">
-            <span className="text-xs font-bold text-purple-900">
-              Viewing Personal Self-Service Profile as Manager/Admin
-            </span>
-            <button
-              onClick={() => setManagementViewMode('overview')}
-              className="text-xs font-black text-purple-700 hover:text-purple-900 underline"
-            >
-              &larr; Return to Management Overview
-            </button>
-          </div>
-        )}
-        <EmployeeDashboardView currentUser={user} />
-      </div>
-    );
+  if (!isManagement) {
+    return <EmployeeDashboardView currentUser={user} />;
   }
 
   useEffect(() => {
@@ -131,14 +111,6 @@ export const DashboardPage: React.FC = () => {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <button
-              onClick={() => setManagementViewMode('personal')}
-              className="px-4 py-2.5 rounded-xl bg-purple-500/30 hover:bg-purple-500/50 text-purple-200 hover:text-white text-xs font-bold border border-purple-400/40 backdrop-blur-sm transition-all flex items-center gap-1.5"
-              title="View your personal self-service dashboard"
-            >
-              <UserCheck className="w-4 h-4" />
-              <span>My Self-Service View</span>
-            </button>
             {hasRole('hr_payroll_user') && (
               <button
                 onClick={() => navigate('/payruns')}
