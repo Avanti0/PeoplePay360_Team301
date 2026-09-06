@@ -349,3 +349,122 @@ export interface BulkContractDeleteData {
   contractIds: string[];
 }
 
+export interface EmployeeAttendanceItem {
+  id: string;
+  checkIn?: string | null;
+  checkOut?: string | null;
+  workedHours?: number | null;
+  status: string;
+  isManual: boolean;
+  note?: string | null;
+  expectedWorkingDay?: boolean | null;
+}
+
+export interface LeaveAllocationSummary {
+  id: string;
+  timeOffTypeName: string;
+  unit: string;
+  allocatedDays: number;
+  takenDays: number;
+  remainingDays: number;
+}
+
+export interface EmployeeApprovedLeaveItem {
+  id: string;
+  timeOffTypeName: string;
+  dateFrom: string;
+  dateTo: string;
+  duration: number;
+  status: string;
+  reason?: string | null;
+}
+
+export interface EmployeeWarningItem {
+  id: string;
+  title: string;
+  message: string;
+  warningType: string;
+  severity: 'warning' | 'notice' | 'critical' | string;
+  createdAt?: string | null;
+  source: string;
+  status: 'pending' | 'resolved' | string;
+}
+
+export interface EmployeeScheduleLineItem {
+  dayOfWeek: number;
+  dayName: string;
+  isWorkingDay: boolean;
+  startTime?: string | null;
+  endTime?: string | null;
+  breakMinutes: number;
+  dailyHours: number;
+}
+
+export interface EmployeeScheduleSummary {
+  scheduleId?: string | null;
+  scheduleName: string;
+  weeklyWorkingDays: number;
+  totalWeeklyHours: number;
+  lines: EmployeeScheduleLineItem[];
+}
+
+export interface EmployeePayslipSummaryItem {
+  id: string;
+  payrunId: string;
+  periodStart: string;
+  periodEnd: string;
+  grossSalary: number;
+  deductions: number;
+  netSalary: number;
+  status: string;
+  workedDays: number;
+  expectedWorkingDays?: number | null;
+}
+
+export interface EmployeePayslipLineItem {
+  name: string;
+  code: string;
+  category: string;
+  amount: number;
+}
+
+export interface EmployeeSalarySummary {
+  latestNetSalary: number;
+  latestGrossSalary: number;
+  latestDeductions: number;
+  averageNetSalary: number;
+  totalPayoutsCount: number;
+  currency: string;
+  bankName?: string | null;
+  bankAccountMasked?: string | null;
+  bankIfsc?: string | null;
+  monthlyTrend: EmployeePayslipSummaryItem[];
+  latestPayslipLines: EmployeePayslipLineItem[];
+}
+
+export interface EmployeeDashboardData {
+  employee?: {
+    id: string;
+    name: string;
+    email: string;
+    department?: string;
+    jobPosition?: string;
+    employmentStatus: string;
+  } | null;
+  attendanceHealth: {
+    attendanceHealthPercentage: number;
+    totalRecords: number;
+    presentDays: number;
+    lateDays: number;
+    absentOrOtherDays: number;
+    totalHoursWorked: number;
+  };
+  recentAttendance: EmployeeAttendanceItem[];
+  approvedLeaves: EmployeeApprovedLeaveItem[];
+  leaveAllocations: LeaveAllocationSummary[];
+  totalApprovedLeaveDays: number;
+  warnings: EmployeeWarningItem[];
+  schedule: EmployeeScheduleSummary;
+  salary: EmployeeSalarySummary;
+}
+

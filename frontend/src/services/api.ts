@@ -20,7 +20,8 @@ import {
   BulkContractCreateData,
   BulkContractUpdateData,
   BulkContractDeleteData,
-  BulkOperationResult
+  BulkOperationResult,
+  EmployeeDashboardData,
 } from '../types';
 import {
   initialEmployees,
@@ -433,7 +434,197 @@ function handleMockRoutes(endpoint: string, method: string, body: any): any {
     return { detail: 'User deleted successfully' };
   }
 
-  // Dashboard
+  // Dashboard - Personal Employee Dashboard
+  if (endpoint === '/dashboard/me' && method === 'GET') {
+    const user = currentAuthUser;
+    const emp = user?.employeeId
+      ? employeesStore.find((e) => String(e.id) === String(user.employeeId) || String(e.userId) === String(user.id))
+      : (user?.id ? employeesStore.find((e) => String(e.userId) === String(user.id)) : null);
+
+    const empId = emp ? String(emp.id) : (user?.employeeId ? String(user.employeeId) : null);
+
+    const userAtt = empId
+      ? attendanceStore.filter((a) => String(a.employeeId) === empId)
+      : [];
+    const totalRecords = userAtt.length;
+    const presentDays = userAtt.filter((a) => a.status === 'present' || a.status === 'overtime').length;
+    const lateDays = userAtt.filter((a) => a.status === 'late').length;
+    const absentOrOtherDays = totalRecords - presentDays - lateDays;
+    const totalHoursWorked = userAtt.reduce((sum, a) => sum + (a.workedHours || 0), 0);
+    const attendanceHealthPercentage = totalRecords > 0 ? Math.round((presentDays / totalRecords) * 100) : 100;
+
+    const recentAttendance = userAtt.slice(0, 15).map((a) => ({
+      id: a.id,
+      checkIn: a.checkIn,
+      checkOut: a.checkOut,
+      workedHours: a.workedHours,
+      status: a.status,
+      isManual: a.isManual || false,
+      note: a.note,
+      expectedWorkingDay: true,
+    }));
+
+    const userApprovedRequests = empId
+      ? timeOffRequestsStore.filter((r) => String(r.employeeId) === empId && r.status === 'approved')
+      : [];
+    const totalApprovedLeaveDays = userApprovedRequests.reduce((sum, r) => sum + r.duration, 0);
+
+    const approvedLeaves = userApprovedRequests.map((r) => ({
+      id: r.id,
+      timeOffTypeName: r.timeOffTypeName || 'Leave',
+      dateFrom: r.dateFrom,
+      dateTo: r.dateTo,
+      duration: r.duration,
+      status: r.status,
+      reason: (r as any).reason || r.note,
+    }));
+
+    const userAllocations = empId
+      ? allocationsStore.filter((a) => String(a.employeeId) === empId)
+      : [];
+    const leaveAllocations = userAllocations.map((a) => ({
+      id: a.id,
+      timeOffTypeName: a.timeOffTypeName || 'Leave',
+      unit: 'days',
+      allocatedDays: a.numberOfDays,
+      takenDays: a.taken || 0,
+      remainingDays: a.remaining || a.numberOfDays,
+    }));
+
+    const userPayslips = empId
+      ? payslipsStore.filter((p) => String(p.employeeId) === empId)
+      : [];
+    const warnings: any[] = [];
+    userPayslips.forEach((ps) => {
+      (ps.warnings || []).forEach((msg, idx) => {
+        warnings.push({
+          id: `${ps.id}:${idx}`,
+          title: 'Payroll Notice',
+          message: msg,
+          warningType: 'payroll_notice',
+          severity: 'warning',
+          createdAt: ps.createdAt,
+          source: `Payrun Period ${ps.periodStart} - ${ps.periodEnd}`,
+          status: ps.status === 'paid' ? 'resolved' : 'pending',
+        });
+      });
+    });
+
+    if (emp && (!emp.bankAccountNumber || !emp.bankIfsc)) {
+      warnings.push({
+        id: `bank-missing-${emp.id}`,
+        title: 'Banking Details Notice',
+        message: 'Bank account number or IFSC is missing in your employee record. Please contact HR to ensure automated payroll direct credits.',
+        warningType: 'profile_alert',
+        severity: 'notice',
+        createdAt: new Date().toISOString(),
+        source: 'Employee Profile Validation',
+        status: 'pending',
+      });
+    }
+
+    const schedule = emp?.workingScheduleId
+      ? schedulesStore.find((s) => String(s.id) === String(emp.workingScheduleId))
+      : schedulesStore[0];
+
+    const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    const scheduleLines = (schedule?.lines || []).map((l, i) => ({
+      dayOfWeek: l.dayOfWeek ?? i,
+      dayName: dayNames[l.dayOfWeek ?? i] || `Day ${l.dayOfWeek}`,
+      isWorkingDay: l.isWorkingDay,
+      startTime: l.startTime || (l.isWorkingDay ? '09:00:00' : null),
+      endTime: l.endTime || (l.isWorkingDay ? '18:00:00' : null),
+      breakMinutes: l.breakMinutes || 0,
+      dailyHours: l.isWorkingDay ? 8.0 : 0.0,
+    }));
+
+    const paidSlips = userPayslips.filter((p) => p.status === 'paid');
+    const latestPs = userPayslips[0];
+    const latestNet = latestPs ? latestPs.netSalary : (emp ? 65000 : 0);
+    const latestGross = latestPs ? latestPs.grossSalary : (emp ? 78000 : 0);
+    const latestDeductions = latestPs ? Math.round(latestPs.grossSalary - latestPs.netSalary) : 13000;
+    const avgNet = paidSlips.length > 0
+      ? Math.round(paidSlips.reduce((s, p) => s + p.netSalary, 0) / paidSlips.length)
+      : latestNet;
+
+    const monthlyTrend = userPayslips.slice(0, 6).map((ps) => ({
+      id: ps.id,
+      payrunId: ps.payrunId || 'payrun-1',
+      periodStart: ps.periodStart,
+      periodEnd: ps.periodEnd,
+      grossSalary: ps.grossSalary,
+      deductions: Math.round(ps.grossSalary - ps.netSalary),
+      netSalary: ps.netSalary,
+      status: ps.status,
+      workedDays: ps.workedDays,
+      expectedWorkingDays: ps.expectedWorkingDays || 22,
+    }));
+
+    const latestPayslipLines = (latestPs?.lines || [
+      { name: 'Basic Wage', code: 'BASIC', category: 'basic', amount: latestGross * 0.5 },
+      { name: 'House Rent Allowance (HRA)', code: 'HRA', category: 'allowance', amount: latestGross * 0.25 },
+      { name: 'Special Allowance', code: 'SA', category: 'allowance', amount: latestGross * 0.25 },
+      { name: 'Provident Fund (PF)', code: 'PF', category: 'deduction', amount: latestGross * 0.12 },
+      { name: 'Professional Tax (PT)', code: 'PT', category: 'deduction', amount: 200 },
+    ]).map((l) => ({
+      name: l.name,
+      code: l.code,
+      category: l.category,
+      amount: l.amount,
+    }));
+
+    const maskedAcc = emp?.bankAccountNumber
+      ? `••••${emp.bankAccountNumber.slice(-4)}`
+      : '••••8821';
+
+    const employeeDashboardData: EmployeeDashboardData = {
+      employee: emp ? {
+        id: emp.id,
+        name: emp.name,
+        email: emp.email,
+        department: emp.department,
+        jobPosition: emp.jobPosition,
+        employmentStatus: emp.employmentStatus,
+      } : null,
+      attendanceHealth: {
+        attendanceHealthPercentage,
+        totalRecords,
+        presentDays,
+        lateDays,
+        absentOrOtherDays,
+        totalHoursWorked: Math.round(totalHoursWorked * 10) / 10,
+      },
+      recentAttendance,
+      approvedLeaves,
+      leaveAllocations,
+      totalApprovedLeaveDays,
+      warnings,
+      schedule: {
+        scheduleId: schedule?.id,
+        scheduleName: schedule?.name || 'Standard 40h (Mon-Fri 09:00-18:00)',
+        weeklyWorkingDays: scheduleLines.filter((l) => l.isWorkingDay).length || 5,
+        totalWeeklyHours: scheduleLines.filter((l) => l.isWorkingDay).length * 8.0,
+        lines: scheduleLines,
+      },
+      salary: {
+        latestNetSalary: latestNet,
+        latestGrossSalary: latestGross,
+        latestDeductions,
+        averageNetSalary: avgNet,
+        totalPayoutsCount: paidSlips.length || (latestPs ? 1 : 0),
+        currency: 'INR',
+        bankName: emp?.bankName || 'HDFC Bank',
+        bankAccountMasked: maskedAcc,
+        bankIfsc: emp?.bankIfsc || 'HDFC0001234',
+        monthlyTrend,
+        latestPayslipLines,
+      },
+    };
+
+    return employeeDashboardData;
+  }
+
+  // Dashboard - Operational Overview
   if (endpoint === '/dashboard/kpis' && method === 'GET') {
     const totalNet = payslipsStore.reduce((sum, p) => sum + p.netSalary, 0);
     const avgSalary = payslipsStore.length ? totalNet / payslipsStore.length : 0;
@@ -482,6 +673,24 @@ function handleMockRoutes(endpoint: string, method: string, body: any): any {
   }
 
   if (endpoint === '/dashboard/alerts' && method === 'GET') {
+    if (currentAuthUser && currentAuthUser.role === 'employee') {
+      const empId = currentAuthUser.employeeId;
+      const userSlips = empId ? payslipsStore.filter((p) => String(p.employeeId) === String(empId)) : [];
+      const userAlerts: DashboardAlert[] = [];
+      userSlips.forEach((ps) => {
+        (ps.warnings || []).forEach((msg, idx) => {
+          userAlerts.push({
+            id: `${ps.id}:${idx}`,
+            warningType: 'payroll_notice',
+            employeeId: String(empId),
+            employeeName: currentAuthUser?.employeeName || 'You',
+            message: msg,
+          });
+        });
+      });
+      return userAlerts;
+    }
+
     const alerts: DashboardAlert[] = [
       {
         id: '1',
@@ -1501,6 +1710,7 @@ export const api = {
   },
 
   dashboard: {
+    getEmployeeDashboard: () => request<EmployeeDashboardData>('/dashboard/me'),
     getKpis: () => request<DashboardKPIs>('/dashboard/kpis'),
     getSalaryByDept: () => request<DepartmentSalaryCost[]>('/dashboard/salary-by-dept'),
     getSalaryTrend: () => request<MonthlySalaryTrend[]>('/dashboard/salary-trend'),
