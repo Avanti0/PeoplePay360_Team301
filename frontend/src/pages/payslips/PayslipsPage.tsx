@@ -19,6 +19,9 @@ export const PayslipsPage: React.FC = () => {
   const { error } = useToast();
   const navigate = useNavigate();
 
+  const isHR = hasRole('hr_manager');
+  const currentEmployeeId = user?.employeeId;
+
   const [payslips, setPayslips] = useState<Payslip[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -26,7 +29,7 @@ export const PayslipsPage: React.FC = () => {
 
   useEffect(() => {
     loadPayslips();
-  }, []);
+  }, [user]);
 
   const loadPayslips = async () => {
     setIsLoading(true);
@@ -40,10 +43,15 @@ export const PayslipsPage: React.FC = () => {
     }
   };
 
-  const filteredPayslips = payslips.filter((slip) => {
-    const matchesSearch =
-      (slip.employeeName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (slip.payrunName || '').toLowerCase().includes(searchQuery.toLowerCase());
+  const scopedPayslips = isHR
+    ? payslips
+    : payslips.filter((slip) => !currentEmployeeId || String(slip.employeeId) === String(currentEmployeeId));
+
+  const filteredPayslips = scopedPayslips.filter((slip) => {
+    const matchesSearch = isHR
+      ? (slip.employeeName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (slip.payrunName || '').toLowerCase().includes(searchQuery.toLowerCase())
+      : (slip.payrunName || '').toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === 'all' || slip.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
@@ -62,10 +70,12 @@ export const PayslipsPage: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">
-            Employee Payslips
+            {isHR ? 'Employee Payslips' : 'My Salary Slips'}
           </h2>
           <p className="text-xs text-slate-500">
-            Computed salary breakdowns, rule line items, and print/PDF distribution (FR-10).
+            {isHR
+              ? 'Computed salary breakdowns, rule line items, and print/PDF distribution (FR-10).'
+              : 'View and print your official salary statements and earnings vouchers.'}
           </p>
         </div>
       </div>
@@ -76,7 +86,7 @@ export const PayslipsPage: React.FC = () => {
           <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
-            placeholder="Search by employee, code, or payrun..."
+            placeholder={isHR ? 'Search by employee, code, or payrun...' : 'Search by payrun reference...'}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
@@ -104,7 +114,7 @@ export const PayslipsPage: React.FC = () => {
           <table className="w-full text-left border-collapse text-xs">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase font-bold text-[10px] tracking-wider">
-                <th className="py-3.5 px-4">Employee</th>
+                {isHR && <th className="py-3.5 px-4">Employee</th>}
                 <th className="py-3.5 px-4">Payrun Reference</th>
                 <th className="py-3.5 px-4">Period</th>
                 <th className="py-3.5 px-4">Gross Salary</th>
@@ -115,42 +125,52 @@ export const PayslipsPage: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
-              {filteredPayslips.map((slip) => (
-                <tr
-                  key={slip.id}
-                  onClick={() => navigate(`/payslips/${slip.id}`)}
-                  className="hover:bg-blue-50/40 cursor-pointer transition-colors"
-                >
-                  <td className="py-3.5 px-4">
-                    <p className="font-bold text-slate-900">{slip.employeeName}</p>
-                  </td>
-                  <td className="py-3.5 px-4 text-slate-600 font-semibold">
-                    {slip.payrunName || 'Regular Payrun'}
-                  </td>
-                  <td className="py-3.5 px-4 text-slate-600">
-                    {slip.periodStart} &rarr; {slip.periodEnd}
-                  </td>
-                  <td className="py-3.5 px-4 font-bold text-slate-800">
-                    {formatCurrency(slip.grossSalary)}
-                  </td>
-                  <td className="py-3.5 px-4 font-bold text-rose-600">
-                    {formatCurrency(slip.grossSalary - slip.netSalary)}
-                  </td>
-                  <td className="py-3.5 px-4">
-                    <span className="font-extrabold text-blue-600 text-sm">
-                      {formatCurrency(slip.netSalary)}
-                    </span>
-                  </td>
-                  <td className="py-3.5 px-4">
-                    <StatusBadge status={slip.status} />
-                  </td>
-                  <td className="py-3.5 px-4 text-right">
-                    <span className="text-blue-600 font-bold text-xs inline-flex items-center gap-1">
-                      View Slip &rarr;
-                    </span>
+              {filteredPayslips.length === 0 ? (
+                <tr>
+                  <td colSpan={isHR ? 8 : 7} className="py-8 text-center text-slate-400">
+                    {isLoading ? 'Loading salary slips...' : 'No salary slips found.'}
                   </td>
                 </tr>
-              ))}
+              ) : (
+                filteredPayslips.map((slip) => (
+                  <tr
+                    key={slip.id}
+                    onClick={() => navigate(`/payslips/${slip.id}`)}
+                    className="hover:bg-blue-50/40 cursor-pointer transition-colors"
+                  >
+                    {isHR && (
+                      <td className="py-3.5 px-4">
+                        <p className="font-bold text-slate-900">{slip.employeeName}</p>
+                      </td>
+                    )}
+                    <td className="py-3.5 px-4 text-slate-600 font-semibold">
+                      {slip.payrunName || 'Regular Payrun'}
+                    </td>
+                    <td className="py-3.5 px-4 text-slate-600">
+                      {slip.periodStart} &rarr; {slip.periodEnd}
+                    </td>
+                    <td className="py-3.5 px-4 font-bold text-slate-800">
+                      {formatCurrency(slip.grossSalary)}
+                    </td>
+                    <td className="py-3.5 px-4 font-bold text-rose-600">
+                      {formatCurrency(slip.grossSalary - slip.netSalary)}
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <span className="font-extrabold text-blue-600 text-sm">
+                        {formatCurrency(slip.netSalary)}
+                      </span>
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <StatusBadge status={slip.status} />
+                    </td>
+                    <td className="py-3.5 px-4 text-right">
+                      <span className="text-blue-600 font-bold text-xs inline-flex items-center gap-1">
+                        View Slip &rarr;
+                      </span>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

@@ -160,6 +160,23 @@ def create_request(db: Session, data: TimeOffRequestCreate) -> TimeOffRequest:
     if not time_off_type.is_active:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Time off type is not active")
 
+    # Prevent overlapping confirmed/approved requests for the same employee
+    overlapping = (
+        db.query(TimeOffRequest)
+        .filter(
+            TimeOffRequest.employee_id == data.employee_id,
+            TimeOffRequest.status.in_(["confirmed", "approved"]),
+            TimeOffRequest.date_from <= data.date_to,
+            TimeOffRequest.date_to >= data.date_from,
+        )
+        .first()
+    )
+    if overlapping:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="A time off request already exists for this employee covering the requested date range",
+        )
+
     allocation_id = None
     if time_off_type.requires_allocation:
         allocation = _resolve_allocation(db, data.employee_id, data.time_off_type_id, data.date_from, data.date_to)
@@ -167,6 +184,11 @@ def create_request(db: Session, data: TimeOffRequestCreate) -> TimeOffRequest:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="No approved allocation covers this period for this time off type",
+            )
+        if allocation.remaining < data.duration:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Insufficient leave balance! Available: {allocation.remaining} days, Requested: {data.duration} days",
             )
         allocation_id = allocation.id
 

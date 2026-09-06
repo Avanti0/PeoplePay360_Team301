@@ -531,12 +531,24 @@ function handleMockRoutes(endpoint: string, method: string, body: any): any {
   }
 
   if (endpoint.startsWith('/employees/') && method === 'GET') {
-    const parts = endpoint.split('/');
+    const parts = endpoint.split('?')[0].split('/');
     const id = parts[2];
     const sub = parts[3];
+
+    if (currentAuthUser && currentAuthUser.role === 'employee') {
+      const userEmpId = currentAuthUser.employeeId;
+      if (!userEmpId || String(id) !== String(userEmpId)) {
+        throw new Error('HTTP 403: Insufficient permissions');
+      }
+    }
+
     const emp = employeesStore.find((e) => String(e.id) === String(id));
+    if (!emp) throw new Error('HTTP 404: Employee not found');
 
     if (sub === 'contracts') {
+      if (currentAuthUser && currentAuthUser.role === 'employee') {
+        throw new Error('HTTP 403: Insufficient permissions');
+      }
       return contractsStore.filter((c) => String(c.employeeId) === String(id));
     }
     if (sub === 'attendance') {
@@ -545,7 +557,7 @@ function handleMockRoutes(endpoint: string, method: string, body: any): any {
     if (sub === 'time-off') {
       return timeOffRequestsStore.filter((t) => String(t.employeeId) === String(id));
     }
-    return emp || employeesStore[0];
+    return emp;
   }
 
   if (endpoint === '/employees' && method === 'POST') {
@@ -875,11 +887,37 @@ function handleMockRoutes(endpoint: string, method: string, body: any): any {
   }
 
   // Allocations
-  if (endpoint === '/allocations' && method === 'GET') {
+  if ((endpoint === '/allocations' || endpoint.startsWith('/allocations?')) && method === 'GET') {
+    if (currentAuthUser && currentAuthUser.role === 'employee') {
+      const userEmpId = currentAuthUser.employeeId;
+      return allocationsStore.filter((al) => !userEmpId || String(al.employeeId) === String(userEmpId));
+    }
+    const qs = endpoint.includes('?') ? endpoint.split('?')[1] : '';
+    const params = new URLSearchParams(qs);
+    const empParam = params.get('employee_id');
+    if (empParam) {
+      return allocationsStore.filter((al) => String(al.employeeId) === String(empParam));
+    }
     return allocationsStore;
   }
 
+  if (endpoint.startsWith('/allocations/') && method === 'GET') {
+    const id = endpoint.split('?')[0].split('/')[2];
+    const alloc = allocationsStore.find((a) => String(a.id) === String(id));
+    if (!alloc) throw new Error('HTTP 404: Allocation not found');
+    if (currentAuthUser && currentAuthUser.role === 'employee') {
+      const userEmpId = currentAuthUser.employeeId;
+      if (!userEmpId || String(alloc.employeeId) !== String(userEmpId)) {
+        throw new Error('HTTP 403: Insufficient permissions');
+      }
+    }
+    return alloc;
+  }
+
   if (endpoint === '/allocations' && method === 'POST') {
+    if (currentAuthUser && currentAuthUser.role === 'employee') {
+      throw new Error('HTTP 403: Insufficient permissions');
+    }
     const newAlloc: Allocation = {
       ...body,
       id: String(Date.now()),
@@ -892,7 +930,10 @@ function handleMockRoutes(endpoint: string, method: string, body: any): any {
   }
 
   if (endpoint.startsWith('/allocations/') && method === 'PUT') {
-    const id = endpoint.split('/')[2];
+    if (currentAuthUser && currentAuthUser.role === 'employee') {
+      throw new Error('HTTP 403: Insufficient permissions');
+    }
+    const id = endpoint.split('?')[0].split('/')[2];
     allocationsStore = allocationsStore.map((al) =>
       String(al.id) === String(id) ? { ...al, ...body } : al
     );
@@ -900,14 +941,48 @@ function handleMockRoutes(endpoint: string, method: string, body: any): any {
   }
 
   // Time Off Requests
-  if (endpoint === '/time-off-requests' && method === 'GET') {
-    return timeOffRequestsStore;
+  if ((endpoint === '/time-off-requests' || endpoint.startsWith('/time-off-requests?')) && method === 'GET') {
+    if (currentAuthUser && currentAuthUser.role === 'employee') {
+      const userEmpId = currentAuthUser.employeeId;
+      return timeOffRequestsStore.filter((r) => !userEmpId || String(r.employeeId) === String(userEmpId));
+    }
+    const qs = endpoint.includes('?') ? endpoint.split('?')[1] : '';
+    const params = new URLSearchParams(qs);
+    const empParam = params.get('employee_id');
+    const statusParam = params.get('status');
+    let res = timeOffRequestsStore;
+    if (empParam) res = res.filter((r) => String(r.employeeId) === String(empParam));
+    if (statusParam) res = res.filter((r) => r.status === statusParam);
+    return res;
+  }
+
+  if (endpoint.startsWith('/time-off-requests/') && !endpoint.includes('/approve') && !endpoint.includes('/refuse') && method === 'GET') {
+    const id = endpoint.split('?')[0].split('/')[2];
+    const req = timeOffRequestsStore.find((r) => String(r.id) === String(id));
+    if (!req) throw new Error('HTTP 404: Time off request not found');
+    if (currentAuthUser && currentAuthUser.role === 'employee') {
+      const userEmpId = currentAuthUser.employeeId;
+      if (!userEmpId || String(req.employeeId) !== String(userEmpId)) {
+        throw new Error('HTTP 403: Insufficient permissions');
+      }
+    }
+    return req;
   }
 
   if (endpoint === '/time-off-requests' && method === 'POST') {
+    let empId = body.employeeId;
+    if (currentAuthUser && currentAuthUser.role === 'employee') {
+      const userEmpId = currentAuthUser.employeeId;
+      if (empId && userEmpId && String(empId) !== String(userEmpId)) {
+        throw new Error('HTTP 403: You may only submit time off requests for yourself');
+      }
+      empId = userEmpId || empId;
+    }
+
     const newReq: TimeOffRequest = {
       ...body,
       id: String(Date.now()),
+      employeeId: empId,
       status: 'confirmed',
       createdAt: new Date().toISOString(),
     };
@@ -916,6 +991,9 @@ function handleMockRoutes(endpoint: string, method: string, body: any): any {
   }
 
   if (endpoint.includes('/approve') && method === 'POST') {
+    if (currentAuthUser && currentAuthUser.role === 'employee') {
+      throw new Error('HTTP 403: Insufficient permissions');
+    }
     const id = endpoint.split('/')[2];
     const req = timeOffRequestsStore.find((r) => String(r.id) === String(id));
     if (req) {
@@ -934,6 +1012,9 @@ function handleMockRoutes(endpoint: string, method: string, body: any): any {
   }
 
   if (endpoint.includes('/refuse') && method === 'POST') {
+    if (currentAuthUser && currentAuthUser.role === 'employee') {
+      throw new Error('HTTP 403: Insufficient permissions');
+    }
     const id = endpoint.split('/')[2];
     const req = timeOffRequestsStore.find((r) => String(r.id) === String(id));
     if (req) {
@@ -1126,13 +1207,33 @@ function handleMockRoutes(endpoint: string, method: string, body: any): any {
   }
 
   // Payslips
-  if (endpoint === '/payslips' && method === 'GET') {
-    return payslipsStore;
+  if (endpoint.startsWith('/payslips') && !endpoint.startsWith('/payslips/') && method === 'GET') {
+    if (currentAuthUser && currentAuthUser.role === 'employee') {
+      const userEmpId = currentAuthUser.employeeId;
+      if (!userEmpId) return [];
+      return payslipsStore.filter((s) => String(s.employeeId) === String(userEmpId));
+    }
+    const qs = endpoint.includes('?') ? endpoint.split('?')[1] : '';
+    const params = new URLSearchParams(qs);
+    const payrunId = params.get('payrun_id');
+    const employeeId = params.get('employee_id');
+    let res = payslipsStore;
+    if (payrunId) res = res.filter((s) => String(s.payrunId) === String(payrunId));
+    if (employeeId) res = res.filter((s) => String(s.employeeId) === String(employeeId));
+    return res;
   }
 
   if (endpoint.startsWith('/payslips/') && method === 'GET') {
     const id = endpoint.split('/')[2];
-    return payslipsStore.find((s) => String(s.id) === String(id)) || payslipsStore[0];
+    const slip = payslipsStore.find((s) => String(s.id) === String(id));
+    if (!slip) throw new Error('HTTP 404: Payslip not found');
+    if (currentAuthUser && currentAuthUser.role === 'employee') {
+      const userEmpId = currentAuthUser.employeeId;
+      if (!userEmpId || String(slip.employeeId) !== String(userEmpId)) {
+        throw new Error('HTTP 403: Insufficient permissions');
+      }
+    }
+    return slip;
   }
 
   // Fallback default

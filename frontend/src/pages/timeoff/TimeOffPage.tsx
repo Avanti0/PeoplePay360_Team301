@@ -6,18 +6,23 @@ import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { StatusBadge } from '../../components/common/StatusBadge';
 import { Modal } from '../../components/common/Modal';
-import { CalendarCheck, Plus, Check, X, Layers, PieChart } from 'lucide-react';
+import { CalendarCheck, Plus, Check, X, Layers, PieChart, UserCheck } from 'lucide-react';
 
 interface TimeOffPageProps {
   defaultTab?: 'requests' | 'allocations' | 'types';
 }
 
 export const TimeOffPage: React.FC<TimeOffPageProps> = ({ defaultTab }) => {
-  const { hasRole } = useAuth();
+  const { hasRole, user } = useAuth();
   const { success, error, warning } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
   const navigate = useNavigate();
+
+  const isHR = hasRole('hr_manager');
+  const currentEmployeeId = user?.employeeId;
+  const currentEmployeeName = user?.employeeName || user?.username || 'Employee';
+  const currentDepartment = user?.department || 'General';
 
   const getActiveTabFromLocation = (): 'requests' | 'allocations' | 'types' => {
     if (defaultTab) return defaultTab;
@@ -69,7 +74,7 @@ export const TimeOffPage: React.FC<TimeOffPageProps> = ({ defaultTab }) => {
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [user]);
 
   const loadData = async () => {
     try {
@@ -77,12 +82,12 @@ export const TimeOffPage: React.FC<TimeOffPageProps> = ({ defaultTab }) => {
         api.timeOffRequests.getAll(),
         api.allocations.getAll(),
         api.timeOffTypes.getAll(),
-        api.employees.getAll(),
+        isHR ? api.employees.getAll() : Promise.resolve([]),
       ]);
-      const reqs = reqsRes.status === "fulfilled" ? reqsRes.value : [];
-      const allocs = allocsRes.status === "fulfilled" ? allocsRes.value : [];
-      const types = typesRes.status === "fulfilled" ? typesRes.value : [];
-      const emps = empsRes.status === "fulfilled" ? empsRes.value : [];
+      const reqs = reqsRes.status === 'fulfilled' ? reqsRes.value : [];
+      const allocs = allocsRes.status === 'fulfilled' ? allocsRes.value : [];
+      const types = typesRes.status === 'fulfilled' ? typesRes.value : [];
+      const emps = empsRes.status === 'fulfilled' ? empsRes.value : [];
 
       setRequests(reqs);
       setAllocations(allocs);
@@ -103,6 +108,7 @@ export const TimeOffPage: React.FC<TimeOffPageProps> = ({ defaultTab }) => {
   };
 
   const handleApprove = async (reqId: string | number) => {
+    if (!isHR) return;
     try {
       await api.timeOffRequests.approve(reqId);
       success('Leave request approved. Allocation balance deducted automatically (FR-06).');
@@ -113,6 +119,7 @@ export const TimeOffPage: React.FC<TimeOffPageProps> = ({ defaultTab }) => {
   };
 
   const handleRefuse = async (reqId: string | number) => {
+    if (!isHR) return;
     try {
       await api.timeOffRequests.refuse(reqId);
       warning('Leave request refused.');
@@ -136,7 +143,9 @@ export const TimeOffPage: React.FC<TimeOffPageProps> = ({ defaultTab }) => {
     e.preventDefault();
     const errors: Record<string, string> = {};
 
-    if (!reqEmployeeId) {
+    const effectiveEmployeeId = isHR ? reqEmployeeId : currentEmployeeId;
+
+    if (isHR && !effectiveEmployeeId) {
       errors.employeeId = 'Please select an employee';
     }
     if (!reqTypeId) {
@@ -155,10 +164,16 @@ export const TimeOffPage: React.FC<TimeOffPageProps> = ({ defaultTab }) => {
       errors.duration = 'Duration must be greater than 0 days';
     }
 
-    const emp = employees.find((em) => String(em.id) === String(reqEmployeeId));
+    const emp = isHR
+      ? employees.find((em) => String(em.id) === String(effectiveEmployeeId))
+      : { name: currentEmployeeName, department: currentDepartment };
+
     const lType = leaveTypes.find((t) => String(t.id) === String(reqTypeId));
     const alloc = allocations.find(
-      (a) => String(a.employeeId) === String(reqEmployeeId) && String(a.timeOffTypeId) === String(reqTypeId) && a.status === 'approved'
+      (a) =>
+        String(a.employeeId) === String(effectiveEmployeeId) &&
+        String(a.timeOffTypeId) === String(reqTypeId) &&
+        a.status === 'approved'
     );
 
     if (lType?.requiresAllocation) {
@@ -179,7 +194,7 @@ export const TimeOffPage: React.FC<TimeOffPageProps> = ({ defaultTab }) => {
 
     try {
       await api.timeOffRequests.create({
-        employeeId: reqEmployeeId,
+        employeeId: effectiveEmployeeId,
         employeeName: emp?.name,
         timeOffTypeId: reqTypeId,
         timeOffTypeName: lType?.name,
@@ -202,6 +217,7 @@ export const TimeOffPage: React.FC<TimeOffPageProps> = ({ defaultTab }) => {
 
   const handleCreateAllocation = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isHR) return;
     const errors: Record<string, string> = {};
 
     if (!allocEmployeeId) {
@@ -252,17 +268,57 @@ export const TimeOffPage: React.FC<TimeOffPageProps> = ({ defaultTab }) => {
     }
   };
 
+  const [requestSearchQuery, setRequestSearchQuery] = useState('');
+  const [requestStatusFilter, setRequestStatusFilter] = useState('all');
+
+  const visibleRequests = (isHR
+    ? requests
+    : requests.filter((r) => !currentEmployeeId || String(r.employeeId) === String(currentEmployeeId))
+  ).filter((req) => {
+    const type = leaveTypes.find((t) => String(t.id) === String(req.timeOffTypeId));
+    const emp = employees.find((e) => String(e.id) === String(req.employeeId));
+    const typeName = req.timeOffTypeName || type?.name || '';
+    const empName = req.employeeName || emp?.name || '';
+    const note = req.note || '';
+
+    const matchesSearch = isHR
+      ? empName.toLowerCase().includes(requestSearchQuery.toLowerCase()) ||
+        typeName.toLowerCase().includes(requestSearchQuery.toLowerCase()) ||
+        note.toLowerCase().includes(requestSearchQuery.toLowerCase())
+      : typeName.toLowerCase().includes(requestSearchQuery.toLowerCase()) ||
+        note.toLowerCase().includes(requestSearchQuery.toLowerCase());
+
+    const matchesStatus = requestStatusFilter === 'all' || req.status === requestStatusFilter;
+    return matchesSearch && matchesStatus;
+  });
+
+  const visibleAllocations = isHR
+    ? allocations
+    : allocations.filter((a) => !currentEmployeeId || String(a.employeeId) === String(currentEmployeeId));
+
+  const selectedReqType = leaveTypes.find((t) => String(t.id) === String(reqTypeId));
+  const selectedReqAlloc = allocations.find(
+    (a) =>
+      String(a.employeeId) === String(isHR ? reqEmployeeId : currentEmployeeId) &&
+      String(a.timeOffTypeId) === String(reqTypeId) &&
+      a.status === 'approved'
+  );
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">Time Off & Leave Management</h2>
+          <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">
+            {isHR ? 'Time Off & Leave Management' : 'My Time Off'}
+          </h2>
           <p className="text-xs text-slate-500">
-            Leave types, balance allocations, and automated request approval deduction (FR-05, FR-06).
+            {isHR
+              ? 'Leave types, balance allocations, and automated request approval deduction (FR-05, FR-06).'
+              : 'View your leave balances and submit time off requests.'}
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {hasRole('hr_manager') && (
+          {isHR && (
             <button
               onClick={() => setIsAllocModalOpen(true)}
               className="px-3.5 py-2 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all"
@@ -281,6 +337,51 @@ export const TimeOffPage: React.FC<TimeOffPageProps> = ({ defaultTab }) => {
         </div>
       </div>
 
+      {/* My Leave Balance Summary Cards for Employees */}
+      {!isHR && visibleAllocations.length > 0 && (
+        <div className="space-y-2">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">My Leave Balance</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+            {visibleAllocations.map((alloc) => {
+              const type = leaveTypes.find((t) => String(t.id) === String(alloc.timeOffTypeId));
+              const typeName = alloc.timeOffTypeName || type?.name || 'Leave';
+              const percentRemaining = alloc.numberOfDays
+                ? Math.min(100, Math.max(0, Math.round((alloc.remaining / alloc.numberOfDays) * 100)))
+                : 0;
+
+              return (
+                <div
+                  key={alloc.id}
+                  className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-sm hover:border-blue-200 transition-colors"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-900">{typeName}</span>
+                    <span className="text-[11px] font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      {alloc.remaining} days remaining
+                    </span>
+                  </div>
+                  <div className="mt-3 flex items-baseline justify-between text-xs text-slate-500">
+                    <span>
+                      Allocated: <strong className="text-slate-800">{alloc.numberOfDays}d</strong>
+                    </span>
+                    <span>
+                      Taken: <strong className="text-rose-600">{alloc.taken}d</strong>
+                    </span>
+                  </div>
+                  <div className="mt-2 w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                    <div
+                      className="bg-emerald-500 h-1.5 rounded-full transition-all duration-300"
+                      style={{ width: `${percentRemaining}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Tab Navigation */}
       <div className="flex items-center gap-2 border-b border-slate-200 text-xs font-bold">
         <button
           onClick={() => handleTabChange('requests')}
@@ -289,7 +390,7 @@ export const TimeOffPage: React.FC<TimeOffPageProps> = ({ defaultTab }) => {
           }`}
         >
           <CalendarCheck className="w-4 h-4" />
-          <span>Requests ({requests.length})</span>
+          <span>{isHR ? 'All Requests' : 'My Requests'} ({visibleRequests.length})</span>
         </button>
         <button
           onClick={() => handleTabChange('allocations')}
@@ -298,7 +399,7 @@ export const TimeOffPage: React.FC<TimeOffPageProps> = ({ defaultTab }) => {
           }`}
         >
           <PieChart className="w-4 h-4" />
-          <span>Balance Allocations ({allocations.length})</span>
+          <span>{isHR ? 'Balance Allocations' : 'My Leave Balances'} ({visibleAllocations.length})</span>
         </button>
         <button
           onClick={() => handleTabChange('types')}
@@ -311,74 +412,113 @@ export const TimeOffPage: React.FC<TimeOffPageProps> = ({ defaultTab }) => {
         </button>
       </div>
 
+      {/* Filter Bar for Requests Tab */}
+      {activeTab === 'requests' && (
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-sm flex flex-col md:flex-row gap-4 items-center justify-between">
+          <div className="w-full md:w-80">
+            <input
+              type="text"
+              placeholder={isHR ? 'Search by employee, leave type, note...' : 'Search by leave type or note...'}
+              value={requestSearchQuery}
+              onChange={(e) => setRequestSearchQuery(e.target.value)}
+              className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
+            />
+          </div>
+
+          <div className="flex items-center gap-3 w-full md:w-auto">
+            <select
+              value={requestStatusFilter}
+              onChange={(e) => setRequestStatusFilter(e.target.value)}
+              className="px-3 py-2 text-xs rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
+            >
+              <option value="all">All Request Statuses</option>
+              <option value="approved">Approved</option>
+              <option value="confirmed">Pending / Confirmed</option>
+              <option value="refused">Refused</option>
+              <option value="draft">Draft</option>
+            </select>
+          </div>
+        </div>
+      )}
+
       {activeTab === 'requests' && (
         <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase font-bold text-[11px] tracking-wider">
-                  <th className="py-3.5 px-4">Employee</th>
+                  {isHR && <th className="py-3.5 px-4">Employee</th>}
                   <th className="py-3.5 px-4">Leave Type</th>
                   <th className="py-3.5 px-4">Period</th>
                   <th className="py-3.5 px-4">Duration</th>
                   <th className="py-3.5 px-4">Reason</th>
                   <th className="py-3.5 px-4">Status</th>
-                  {hasRole('hr_manager') && <th className="py-3.5 px-4 text-right">Approval Workflow</th>}
+                  {isHR && <th className="py-3.5 px-4 text-right">Approval Workflow</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
-                {requests.map((req) => {
-                  const emp = employees.find((e) => String(e.id) === String(req.employeeId));
-                  const type = leaveTypes.find((t) => String(t.id) === String(req.timeOffTypeId));
-                  const empName = req.employeeName || emp?.name || "Employee";
-                  const deptName = req.departmentName || emp?.department || "";
-                  const typeName = req.timeOffTypeName || type?.name || "Leave";
-                  return (
-                  <tr key={req.id} className="hover:bg-slate-50/80 transition-colors">
-                    <td className="py-3 px-4">
-                      <div>
-                        <p className="font-bold text-slate-900">{empName}</p>
-                        <p className="text-[10px] text-slate-400">{deptName}</p>
-                      </div>
+                {visibleRequests.length === 0 ? (
+                  <tr>
+                    <td colSpan={isHR ? 7 : 5} className="py-8 text-center text-slate-400">
+                      No time off requests found.
                     </td>
-                    <td className="py-3 px-4 font-semibold text-slate-800">{typeName}</td>
-                    <td className="py-3 px-4 text-slate-600">
-                      {req.dateFrom} &rarr; {req.dateTo}
-                    </td>
-                    <td className="py-3 px-4">
-                      <span className="font-bold text-slate-900">{req.duration}</span> days
-                    </td>
-                    <td className="py-3 px-4 text-slate-500 max-w-xs truncate">{req.note || '-'}</td>
-                    <td className="py-3 px-4">
-                      <StatusBadge status={req.status} />
-                    </td>
-                    {hasRole('hr_manager') && (
-                      <td className="py-3 px-4 text-right">
-                        {(req.status === 'confirmed' || req.status === 'draft') ? (
-                          <div className="inline-flex items-center gap-1.5">
-                            <button
-                              onClick={() => handleApprove(req.id)}
-                              className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 text-xs font-bold flex items-center gap-1 transition-colors"
-                            >
-                              <Check className="w-3.5 h-3.5" />
-                              <span>Approve</span>
-                            </button>
-                            <button
-                              onClick={() => handleRefuse(req.id)}
-                              className="px-2.5 py-1 rounded-lg bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 text-xs font-bold flex items-center gap-1 transition-colors"
-                            >
-                              <X className="w-3.5 h-3.5" />
-                              <span>Refuse</span>
-                            </button>
-                          </div>
-                        ) : (
-                          <span className="text-[11px] text-slate-400 italic">Completed</span>
-                        )}
-                      </td>
-                    )}
                   </tr>
-                  );
-                })}
+                ) : (
+                  visibleRequests.map((req) => {
+                    const emp = employees.find((e) => String(e.id) === String(req.employeeId));
+                    const type = leaveTypes.find((t) => String(t.id) === String(req.timeOffTypeId));
+                    const empName = req.employeeName || emp?.name || "Employee";
+                    const deptName = req.departmentName || emp?.department || "";
+                    const typeName = req.timeOffTypeName || type?.name || "Leave";
+                    return (
+                    <tr key={req.id} className="hover:bg-slate-50/80 transition-colors">
+                      {isHR && (
+                        <td className="py-3 px-4">
+                          <div>
+                            <p className="font-bold text-slate-900">{empName}</p>
+                            <p className="text-[10px] text-slate-400">{deptName}</p>
+                          </div>
+                        </td>
+                      )}
+                      <td className="py-3 px-4 font-semibold text-slate-800">{typeName}</td>
+                      <td className="py-3 px-4 text-slate-600">
+                        {req.dateFrom} &rarr; {req.dateTo}
+                      </td>
+                      <td className="py-3 px-4">
+                        <span className="font-bold text-slate-900">{req.duration}</span> days
+                      </td>
+                      <td className="py-3 px-4 text-slate-500 max-w-xs truncate">{req.note || '-'}</td>
+                      <td className="py-3 px-4">
+                        <StatusBadge status={req.status} />
+                      </td>
+                      {isHR && (
+                        <td className="py-3 px-4 text-right">
+                          {(req.status === 'confirmed' || req.status === 'draft') ? (
+                            <div className="inline-flex items-center gap-1.5">
+                              <button
+                                onClick={() => handleApprove(req.id)}
+                                className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 text-xs font-bold flex items-center gap-1 transition-colors"
+                              >
+                                <Check className="w-3.5 h-3.5" />
+                                <span>Approve</span>
+                              </button>
+                              <button
+                                onClick={() => handleRefuse(req.id)}
+                                className="px-2.5 py-1 rounded-lg bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 text-xs font-bold flex items-center gap-1 transition-colors"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                                <span>Refuse</span>
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="text-[11px] text-slate-400 italic">Completed</span>
+                          )}
+                        </td>
+                      )}
+                    </tr>
+                    );
+                  })
+                )}
               </tbody>
             </table>
           </div>
@@ -391,8 +531,8 @@ export const TimeOffPage: React.FC<TimeOffPageProps> = ({ defaultTab }) => {
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase font-bold text-[11px] tracking-wider">
-                  <th className="py-3.5 px-4">Employee</th>
-                  <th className="py-3.5 px-4">Type</th>
+                  {isHR && <th className="py-3.5 px-4">Employee</th>}
+                  <th className="py-3.5 px-4">Leave Type</th>
                   <th className="py-3.5 px-4">Validity</th>
                   <th className="py-3.5 px-4">Allocated</th>
                   <th className="py-3.5 px-4">Taken</th>
@@ -401,31 +541,39 @@ export const TimeOffPage: React.FC<TimeOffPageProps> = ({ defaultTab }) => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
-                {allocations.map((alloc) => {
-                  const emp = employees.find((e) => String(e.id) === String(alloc.employeeId));
-                  const type = leaveTypes.find((t) => String(t.id) === String(alloc.timeOffTypeId));
-                  const empName = alloc.employeeName || emp?.name || "Employee";
-                  const typeName = alloc.timeOffTypeName || type?.name || "Leave";
-                  return (
-                  <tr key={alloc.id} className="hover:bg-slate-50/80 transition-colors">
-                    <td className="py-3 px-4 font-bold text-slate-900">{empName}</td>
-                    <td className="py-3 px-4 font-semibold text-slate-800">{typeName}</td>
-                    <td className="py-3 px-4 text-slate-500">
-                      {alloc.dateFrom} &rarr; {alloc.dateTo || 'Ongoing'}
-                    </td>
-                    <td className="py-3 px-4 font-bold text-slate-800">{alloc.numberOfDays} days</td>
-                    <td className="py-3 px-4 text-rose-600 font-semibold">{alloc.taken} days</td>
-                    <td className="py-3 px-4">
-                      <span className="font-extrabold text-emerald-600 text-sm">
-                        {alloc.remaining} days
-                      </span>
-                    </td>
-                    <td className="py-3 px-4">
-                      <StatusBadge status={alloc.status} />
+                {visibleAllocations.length === 0 ? (
+                  <tr>
+                    <td colSpan={isHR ? 7 : 6} className="py-8 text-center text-slate-400">
+                      No leave allocations found.
                     </td>
                   </tr>
-                  );
-                })}
+                ) : (
+                  visibleAllocations.map((alloc) => {
+                    const emp = employees.find((e) => String(e.id) === String(alloc.employeeId));
+                    const type = leaveTypes.find((t) => String(t.id) === String(alloc.timeOffTypeId));
+                    const empName = alloc.employeeName || emp?.name || "Employee";
+                    const typeName = alloc.timeOffTypeName || type?.name || "Leave";
+                    return (
+                    <tr key={alloc.id} className="hover:bg-slate-50/80 transition-colors">
+                      {isHR && <td className="py-3 px-4 font-bold text-slate-900">{empName}</td>}
+                      <td className="py-3 px-4 font-semibold text-slate-800">{typeName}</td>
+                      <td className="py-3 px-4 text-slate-500">
+                        {alloc.dateFrom} &rarr; {alloc.dateTo || 'Ongoing'}
+                      </td>
+                      <td className="py-3 px-4 font-bold text-slate-800">{alloc.numberOfDays} days</td>
+                      <td className="py-3 px-4 text-rose-600 font-semibold">{alloc.taken} days</td>
+                      <td className="py-3 px-4">
+                        <span className="font-extrabold text-emerald-600 text-sm">
+                          {alloc.remaining} days
+                        </span>
+                      </td>
+                      <td className="py-3 px-4">
+                        <StatusBadge status={alloc.status} />
+                      </td>
+                    </tr>
+                    );
+                  })
+                )}
               </tbody>
             </table>
           </div>
@@ -461,35 +609,61 @@ export const TimeOffPage: React.FC<TimeOffPageProps> = ({ defaultTab }) => {
         maxWidth="md"
       >
         <form onSubmit={handleCreateRequest} className="space-y-4">
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">
-              Employee <span className="text-rose-500">*</span>
-            </label>
-            <select
-              value={reqEmployeeId}
-              onChange={(e) => {
-                setReqEmployeeId(e.target.value);
-                if (reqErrors.employeeId) setReqErrors({ ...reqErrors, employeeId: '' });
-              }}
-              className={`w-full px-3 py-2 text-xs rounded-xl border ${
-                reqErrors.employeeId ? 'border-rose-300 bg-rose-50/40' : 'border-slate-300'
-              } focus:ring-2 focus:ring-blue-500 outline-none`}
-            >
-              {employees.map((e) => (
-                <option key={e.id} value={e.id}>
-                  {e.name}
-                </option>
-              ))}
-            </select>
-            {reqErrors.employeeId && (
-              <p className="text-[11px] font-semibold text-rose-600 mt-1">{reqErrors.employeeId}</p>
-            )}
-          </div>
+          {isHR ? (
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Employee <span className="text-rose-500">*</span>
+              </label>
+              <select
+                value={reqEmployeeId}
+                onChange={(e) => {
+                  setReqEmployeeId(e.target.value);
+                  if (reqErrors.employeeId) setReqErrors({ ...reqErrors, employeeId: '' });
+                }}
+                className={`w-full px-3 py-2 text-xs rounded-xl border ${
+                  reqErrors.employeeId ? 'border-rose-300 bg-rose-50/40' : 'border-slate-300'
+                } focus:ring-2 focus:ring-blue-500 outline-none`}
+              >
+                {employees.map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {e.name}
+                  </option>
+                ))}
+              </select>
+              {reqErrors.employeeId && (
+                <p className="text-[11px] font-semibold text-rose-600 mt-1">{reqErrors.employeeId}</p>
+              )}
+            </div>
+          ) : (
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Employee</label>
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs">
+                  <UserCheck className="w-4 h-4" />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-slate-800">{currentEmployeeName}</p>
+                  <p className="text-[10px] text-slate-500">{currentDepartment} &bull; Self-Service Request</p>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">
-              Leave Type <span className="text-rose-500">*</span>
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-xs font-bold text-slate-700">
+                Leave Type <span className="text-rose-500">*</span>
+              </label>
+              {selectedReqType && (
+                <span className="text-[11px] font-semibold text-slate-500">
+                  {selectedReqAlloc
+                    ? `Available: ${selectedReqAlloc.remaining} days`
+                    : selectedReqType.requiresAllocation
+                    ? 'Available: 0 days'
+                    : 'Unlimited (No balance limit)'}
+                </span>
+              )}
+            </div>
             <select
               value={reqTypeId}
               onChange={(e) => {

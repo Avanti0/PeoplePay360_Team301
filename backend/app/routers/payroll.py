@@ -11,6 +11,7 @@ from app.core.dependencies import (
     require_hr_payroll_manager,
     require_admin,
     get_current_user,
+    is_hr_manager_or_above,
     is_hr_payroll_user_or_above,
     current_employee_id,
 )
@@ -109,7 +110,7 @@ def list_payslips(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if not is_hr_payroll_user_or_above(current_user):
+    if not is_hr_manager_or_above(current_user):
         emp_id = current_employee_id(current_user)
         if not emp_id:
             return []
@@ -123,8 +124,10 @@ def get_payslip(
     current_user: User = Depends(get_current_user),
 ):
     record = svc.get_payslip(db, payslip_id)
-    if not is_hr_payroll_user_or_above(current_user) and current_employee_id(current_user) != record.employee_id:
-        raise HTTPException(status_code=403, detail="Insufficient permissions")
+    if not is_hr_manager_or_above(current_user):
+        emp_id = current_employee_id(current_user)
+        if not emp_id or emp_id != record.employee_id:
+            raise HTTPException(status_code=403, detail="Insufficient permissions")
     return record
 
 @payslips_router.get("/{payslip_id}/pdf")
@@ -134,8 +137,10 @@ def download_pdf(
     current_user: User = Depends(get_current_user),
 ):
     record = svc.get_payslip(db, payslip_id)
-    if not is_hr_payroll_user_or_above(current_user) and current_employee_id(current_user) != record.employee_id:
-        raise HTTPException(status_code=403, detail="Insufficient permissions")
+    if not is_hr_manager_or_above(current_user):
+        emp_id = current_employee_id(current_user)
+        if not emp_id or emp_id != record.employee_id:
+            raise HTTPException(status_code=403, detail="Insufficient permissions")
     path = generate_payslip_pdf(db, payslip_id)
     return FileResponse(path, media_type="application/pdf",
                         filename=f"payslip_{payslip_id}.pdf")

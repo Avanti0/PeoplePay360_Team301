@@ -27,8 +27,10 @@ const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'
 export const EmployeeDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { hasRole } = useAuth();
+  const { hasRole, user } = useAuth();
   const { success, error } = useToast();
+
+  const isHR = hasRole('hr_manager');
 
   const [employee, setEmployee] = useState<Employee | null>(null);
   const [contracts, setContracts] = useState<Contract[]>([]);
@@ -40,18 +42,28 @@ export const EmployeeDetailPage: React.FC = () => {
 
   useEffect(() => {
     if (id) {
+      if (!isHR && user?.employeeId && String(id) !== String(user.employeeId)) {
+        error('Access denied: You can only view your own employee profile');
+        navigate('/dashboard');
+        return;
+      }
       loadEmployeeDetails(id);
     }
-  }, [id]);
+  }, [id, user]);
 
   const loadEmployeeDetails = async (empId: string) => {
     setIsLoading(true);
     try {
+      if (!isHR && user?.employeeId && String(empId) !== String(user.employeeId)) {
+        error('Access denied: You can only view your own employee profile');
+        navigate('/dashboard');
+        return;
+      }
       const [emp, contractList, attList, toList] = await Promise.all([
         api.employees.getById(empId),
-        api.employees.getContracts(empId),
-        api.employees.getAttendance(empId),
-        api.employees.getTimeOff(empId),
+        isHR ? api.employees.getContracts(empId).catch(() => []) : Promise.resolve([]),
+        api.employees.getAttendance(empId).catch(() => []),
+        api.employees.getTimeOff(empId).catch(() => []),
       ]);
       setEmployee(emp);
       setContracts(contractList);

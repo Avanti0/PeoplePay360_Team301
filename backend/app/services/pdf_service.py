@@ -21,7 +21,10 @@ def _ensure_dir():
     os.makedirs(PDF_DIR, exist_ok=True)
 
 
-def generate_payslip_pdf(db: Session, payslip_id: int) -> str:
+from typing import Any, Union
+from uuid import UUID
+
+def generate_payslip_pdf(db: Session, payslip_id: Union[UUID, int, str]) -> str:
     payslip = db.query(Payslip).filter(Payslip.id == payslip_id).first()
     if not payslip:
         raise HTTPException(status_code=404, detail="Payslip not found")

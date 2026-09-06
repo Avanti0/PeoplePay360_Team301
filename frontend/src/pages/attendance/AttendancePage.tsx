@@ -595,18 +595,18 @@ export const AttendancePage: React.FC = () => {
       <Modal
         isOpen={isPunchModalOpen}
         onClose={() => setIsPunchModalOpen(false)}
-        title={isHR ? 'Record Attendance Punch' : 'Record My Attendance Punch'}
+        title="Record Attendance Punch"
         subtitle={
           isHR
             ? 'Log clock punch for selected employee'
             : isCheckedIn
-            ? 'Confirm clock-out punch for today'
-            : 'Confirm clock-in punch for today'
+            ? 'Record your shift clock-out punch for today'
+            : 'Record your shift clock-in punch for today'
         }
         maxWidth="md"
       >
         <form onSubmit={handleRecordNewPunch} className="space-y-4">
-          {/* Employee Selector (HR Only) vs Locked Identity (Self-Service) */}
+          {/* Employee Selector (HR Only) vs Authenticated User Banner (Self-Service) */}
           {isHR ? (
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
@@ -693,8 +693,8 @@ export const AttendancePage: React.FC = () => {
                 : isHR
                 ? 'Record Punch Now'
                 : isCheckedIn
-                ? 'Confirm Clock-Out'
-                : 'Confirm Clock-In'}
+                ? 'Record Clock-Out Now'
+                : 'Record Punch Now'}
             </button>
           </div>
         </form>

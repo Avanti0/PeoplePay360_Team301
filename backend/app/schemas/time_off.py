@@ -105,7 +105,7 @@ class AllocationOut(BaseModel):
 # --- Time Off Requests ---
 
 class TimeOffRequestCreate(BaseModel):
-    employee_id: UUID
+    employee_id: Optional[UUID] = None
     time_off_type_id: UUID
     date_from: date
     date_to: date

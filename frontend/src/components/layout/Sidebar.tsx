@@ -93,9 +93,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
           ? [
               { name: 'Leave Types', to: '/time-off/types', icon: Layers },
               { name: 'Allocations', to: '/time-off/allocations', icon: PieChart },
+              { name: 'All Requests', to: '/time-off/requests', icon: CalendarCheck },
             ]
-          : []),
-        { name: 'Requests', to: '/time-off/requests', icon: CalendarCheck },
+          : [
+              { name: 'My Time Off', to: '/time-off/requests', icon: CalendarCheck },
+            ]),
       ],
     },
     {
@@ -107,9 +109,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
               { name: 'Salary Structures', to: '/salary-structures', icon: Layers },
               { name: 'Salary Rules', to: '/salary-rules', icon: Sliders },
               { name: 'Payruns', to: '/payruns', icon: Calculator },
+              { name: 'Employee Payslips', to: '/payslips', icon: Receipt },
             ]
-          : []),
-        { name: 'Payslips', to: '/payslips', icon: Receipt },
+          : [
+              { name: 'My Payslips', to: '/payslips', icon: Receipt },
+            ]),
       ],
     },
     ...(isAdmin

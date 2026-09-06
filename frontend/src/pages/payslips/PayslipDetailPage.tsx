@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../../services/api';
 import { Payslip } from '../../types';
+import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../context/ToastContext';
 import { StatusBadge } from '../../components/common/StatusBadge';
 import {
   ArrowLeft,
@@ -17,21 +19,31 @@ import {
 export const PayslipDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { hasRole, user } = useAuth();
+  const { error } = useToast();
+
+  const isHR = hasRole('hr_manager');
 
   const [payslip, setPayslip] = useState<Payslip | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     if (id) loadPayslip(id);
-  }, [id]);
+  }, [id, user]);
 
   const loadPayslip = async (slipId: string) => {
     setIsLoading(true);
     try {
       const data = await api.payslips.getById(slipId);
+      if (!isHR && user?.employeeId && data.employeeId && String(data.employeeId) !== String(user.employeeId)) {
+        error('Access denied: You can only view your own salary slips');
+        navigate('/payslips');
+        return;
+      }
       setPayslip(data);
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      error(err.message || 'Failed to load payslip: Access denied');
+      navigate('/payslips');
     } finally {
       setIsLoading(false);
     }
