@@ -1,7 +1,7 @@
 from datetime import date, datetime, timezone
 from typing import Optional
 from fastapi import HTTPException, status
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, selectinload
 from sqlalchemy.exc import IntegrityError
 
 from app.models.payroll import SalaryStructure, SalaryRule, Payrun, PayrunEmployee, Payslip, PayslipLine
@@ -273,10 +273,12 @@ def mark_paid(db: Session, payrun_id) -> Payrun:
 # ── Payslips ──────────────────────────────────────────────────────────────────
 
 def _with_employee_schedule(query):
-    """Eager-load employee -> working_schedule -> lines so Payslip.expected_working_days
-    doesn't trigger N+1 lookups."""
+    """Eager-load employee -> working_schedule -> lines (for employee_name /
+    expected_working_days) and the payslip's own lines — each via a separate
+    batched query (selectinload) rather than one lazy query per payslip."""
     return query.options(
-        joinedload(Payslip.employee).joinedload(Employee.working_schedule).joinedload(WorkingSchedule.lines)
+        joinedload(Payslip.employee).joinedload(Employee.working_schedule).selectinload(WorkingSchedule.lines),
+        selectinload(Payslip.lines),
     )
 
 def list_payslips(db: Session, payrun_id=None, employee_id=None) -> list[Payslip]:

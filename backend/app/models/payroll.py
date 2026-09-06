@@ -106,6 +106,10 @@ class Payslip(Base):
     )
 
     @property
+    def employee_name(self) -> Optional[str]:
+        return self.employee.name if self.employee else None
+
+    @property
     def expected_working_days(self) -> Optional[int]:
         """Working days per the employee's assigned schedule within this
         payslip's period — informational context alongside worked_days,

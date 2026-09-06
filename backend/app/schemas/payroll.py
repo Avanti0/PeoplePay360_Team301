@@ -127,6 +127,7 @@ class PayslipOut(BaseModel):
     id: UUID
     payrun_id: UUID
     employee_id: UUID
+    employee_name: Optional[str] = None
     contract_id: Optional[UUID] = None
     period_start: date
     period_end: date
