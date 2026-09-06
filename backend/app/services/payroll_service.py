@@ -194,8 +194,17 @@ def compute_payrun(db: Session, payrun_id) -> Payrun:
         warnings: list[str] = []
         if not contract:
             warnings.append("No active contract found for this payroll period")
-        elif not getattr(emp, "bank_account_number", None):
+        if contract and not getattr(emp, "bank_account_number", None):
             warnings.append("Employee has no bank account on file")
+        if contract and contract.salary_structure_id and contract.salary_structure_id != payrun.salary_structure_id:
+            contract_structure = (
+                db.query(SalaryStructure).filter(SalaryStructure.id == contract.salary_structure_id).first()
+            )
+            contract_structure_name = contract_structure.name if contract_structure else "a different structure"
+            warnings.append(
+                f"Employee's contract uses the '{contract_structure_name}' salary structure, but this payrun "
+                f"computes under '{structure.name}' — verify this employee belongs in this payrun."
+            )
 
         wage = float(contract.wage) if contract else 0.0
         ctx = _execute_rules(active_rules, wage)
