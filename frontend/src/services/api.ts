@@ -291,11 +291,18 @@ function handleMockRoutes(endpoint: string, method: string, body: any): any {
       throw new Error('Invalid credentials');
     }
 
-    const matchedUser = demoUsers.find(
-      (u) =>
-        u.username.toLowerCase() === inputUsername ||
-        u.email?.toLowerCase() === inputUsername
-    );
+    const matchedUser =
+      usersStore.find(
+        (u) =>
+          u.username.toLowerCase() === inputUsername ||
+          u.email?.toLowerCase() === inputUsername ||
+          u.employeeEmail?.toLowerCase() === inputUsername
+      ) ||
+      demoUsers.find(
+        (u) =>
+          u.username.toLowerCase() === inputUsername ||
+          u.email?.toLowerCase() === inputUsername
+      );
 
     const user: User = matchedUser || {
       id: '99',
@@ -338,11 +345,12 @@ function handleMockRoutes(endpoint: string, method: string, body: any): any {
   }
 
   // Users Management
-  if (endpoint === '/users' && method === 'GET') {
+  if ((endpoint === '/users' || endpoint.startsWith('/users?')) && method === 'GET') {
     return usersStore.map((u) => {
-      const emp = employeesStore.find((e) => e.userId === u.id || e.id === u.employeeId);
+      const emp = employeesStore.find((e) => String(e.userId) === String(u.id) || String(e.id) === String(u.employeeId));
       return {
         ...u,
+        role: u.role || 'employee',
         employeeId: emp?.id || u.employeeId,
         employeeName: emp?.name || u.employeeName,
         employeeEmail: emp?.email || u.email,
@@ -353,12 +361,13 @@ function handleMockRoutes(endpoint: string, method: string, body: any): any {
   }
 
   if (endpoint.startsWith('/users/') && method === 'GET') {
-    const id = endpoint.split('/')[2];
-    const user = usersStore.find((u) => u.id === id);
+    const id = endpoint.split('?')[0].split('/')[2];
+    const user = usersStore.find((u) => String(u.id) === String(id));
     if (!user) throw new Error('User not found');
-    const emp = employeesStore.find((e) => e.userId === user.id || e.id === user.employeeId);
+    const emp = employeesStore.find((e) => String(e.userId) === String(user.id) || String(e.id) === String(user.employeeId));
     return {
       ...user,
+      role: user.role || 'employee',
       employeeId: emp?.id || user.employeeId,
       employeeName: emp?.name || user.employeeName,
       employeeEmail: emp?.email || user.email,
@@ -367,13 +376,16 @@ function handleMockRoutes(endpoint: string, method: string, body: any): any {
   }
 
   if (endpoint === '/users' && method === 'POST') {
-    const emp = body.employee_id ? employeesStore.find((e) => e.id === body.employee_id) : null;
+    const empId = body.employee_id || body.employeeId || null;
+    const emp = empId ? employeesStore.find((e) => String(e.id) === String(empId)) : null;
+    const targetRole = body.role || body.role_name || body.roleName || 'employee';
+
     const newUser: User = {
       id: 'usr-' + Date.now(),
       username: body.username,
-      role: body.role,
-      isActive: body.is_active !== undefined ? body.is_active : true,
-      employeeId: emp?.id,
+      role: targetRole,
+      isActive: body.is_active !== undefined ? body.is_active : (body.isActive !== undefined ? body.isActive : true),
+      employeeId: emp?.id || empId,
       employeeName: emp?.name,
       employeeEmail: emp?.email,
       department: emp?.department,
@@ -387,36 +399,40 @@ function handleMockRoutes(endpoint: string, method: string, body: any): any {
   }
 
   if (endpoint.startsWith('/users/') && method === 'PUT') {
-    const id = endpoint.split('/')[2];
-    const userIndex = usersStore.findIndex((u) => u.id === id);
+    const id = endpoint.split('?')[0].split('/')[2];
+    const userIndex = usersStore.findIndex((u) => String(u.id) === String(id));
     if (userIndex === -1) throw new Error('User not found');
     const prev = usersStore[userIndex];
-    let emp = prev.employeeId ? employeesStore.find((e) => e.id === prev.employeeId) : null;
-    if (body.employee_id !== undefined) {
+    const newEmpId = body.employee_id !== undefined ? body.employee_id : body.employeeId;
+    let emp = prev.employeeId ? employeesStore.find((e) => String(e.id) === String(prev.employeeId)) : null;
+
+    if (newEmpId !== undefined) {
       if (emp) emp.userId = undefined;
-      emp = body.employee_id ? employeesStore.find((e) => e.id === body.employee_id) : null;
+      emp = newEmpId ? employeesStore.find((e) => String(e.id) === String(newEmpId)) : null;
       if (emp) emp.userId = id;
     }
+
+    const targetRole = body.role || body.role_name || body.roleName || prev.role;
     const updated: User = {
       ...prev,
-      role: body.role || prev.role,
-      isActive: body.is_active !== undefined ? body.is_active : prev.isActive,
-      employeeId: emp?.id,
-      employeeName: emp?.name,
-      employeeEmail: emp?.email,
-      department: emp?.department,
+      role: targetRole,
+      isActive: body.is_active !== undefined ? body.is_active : (body.isActive !== undefined ? body.isActive : prev.isActive),
+      employeeId: emp?.id || (newEmpId !== undefined ? newEmpId : prev.employeeId),
+      employeeName: emp?.name || prev.employeeName,
+      employeeEmail: emp?.email || prev.employeeEmail,
+      department: emp?.department || prev.department,
     };
     usersStore[userIndex] = updated;
     return updated;
   }
 
   if (endpoint.startsWith('/users/') && method === 'DELETE') {
-    const id = endpoint.split('/')[2];
-    const user = usersStore.find((u) => u.id === id);
+    const id = endpoint.split('?')[0].split('/')[2];
+    const user = usersStore.find((u) => String(u.id) === String(id));
     if (!user) throw new Error('User not found');
-    const emp = employeesStore.find((e) => e.userId === id);
+    const emp = employeesStore.find((e) => String(e.userId) === String(id));
     if (emp) emp.userId = undefined;
-    usersStore = usersStore.filter((u) => u.id !== id);
+    usersStore = usersStore.filter((u) => String(u.id) !== String(id));
     return { detail: 'User deleted successfully' };
   }
 
