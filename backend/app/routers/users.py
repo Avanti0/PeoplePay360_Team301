@@ -57,7 +57,7 @@ def create_user(data: UserCreateAdmin, db: Session = Depends(get_db)):
     user = User(
         username=data.username,
         password_hash=hash_password(data.password),
-        role=data.role.value,
+        role=data.role.value if hasattr(data.role, "value") else str(data.role),
         is_active=data.is_active,
     )
     db.add(user)
@@ -78,7 +78,7 @@ def update_user(user_id: UUID, data: UserUpdateAdmin, db: Session = Depends(get_
         raise HTTPException(status_code=404, detail="User not found")
 
     if data.role is not None:
-        user.role = data.role.value
+        user.role = data.role.value if hasattr(data.role, "value") else str(data.role)
     if data.is_active is not None:
         user.is_active = data.is_active
     if data.password:

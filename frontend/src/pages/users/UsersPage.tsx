@@ -55,6 +55,22 @@ const ROLE_OPTIONS: { value: RoleName; label: string; description: string; badge
   },
 ];
 
+export const normalizeRole = (role?: string): RoleName => {
+  if (!role) return 'employee';
+  const clean = role.toLowerCase().replace(/-/g, '_').trim();
+  if (clean === 'admin' || clean === 'administrator' || clean === 'system_admin') return 'admin';
+  if (clean === 'hr_payroll_manager' || clean === 'payroll_manager') return 'hr_payroll_manager';
+  if (
+    clean === 'hr_payroll_user' ||
+    clean === 'payroll_user' ||
+    clean === 'payroll_admin' ||
+    clean === 'payroll_administrator'
+  )
+    return 'hr_payroll_user';
+  if (clean === 'hr_manager' || clean === 'hrmanager' || clean === 'hr') return 'hr_manager';
+  return 'employee';
+};
+
 export const UsersPage: React.FC = () => {
   const { user: currentAuthUser, hasRole } = useAuth();
   const { success, error } = useToast();
@@ -133,9 +149,10 @@ export const UsersPage: React.FC = () => {
   const stats = useMemo(() => {
     const total = users.length;
     const active = users.filter((u) => u.isActive).length;
-    const privileged = users.filter(
-      (u) => u.role === 'admin' || u.role === 'hr_payroll_manager' || u.role === 'hr_manager'
-    ).length;
+    const privileged = users.filter((u) => {
+      const r = normalizeRole(u.role);
+      return r === 'admin' || r === 'hr_payroll_manager' || r === 'hr_manager' || r === 'hr_payroll_user';
+    }).length;
     const linked = users.filter((u) => u.employeeId).length;
     return { total, active, privileged, linked };
   }, [users]);
@@ -149,7 +166,7 @@ export const UsersPage: React.FC = () => {
         (u.email && u.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (u.department && u.department.toLowerCase().includes(searchTerm.toLowerCase()));
 
-      const matchRole = roleFilter === 'all' || u.role === roleFilter;
+      const matchRole = roleFilter === 'all' || normalizeRole(u.role) === roleFilter;
       const matchStatus =
         statusFilter === 'all' ||
         (statusFilter === 'active' && u.isActive) ||
@@ -162,9 +179,9 @@ export const UsersPage: React.FC = () => {
   // Available employees for linking (not already assigned to another user)
   const availableEmployees = useMemo(() => {
     const usedEmployeeIds = new Set(
-      users.filter((u) => u.employeeId && (!selectedUser || u.id !== selectedUser.id)).map((u) => u.employeeId)
+      users.filter((u) => u.employeeId && (!selectedUser || String(u.id) !== String(selectedUser.id))).map((u) => String(u.employeeId))
     );
-    return employees.filter((e) => !usedEmployeeIds.has(e.id));
+    return employees.filter((e) => !usedEmployeeIds.has(String(e.id)));
   }, [employees, users, selectedUser]);
 
   // Handlers
@@ -184,8 +201,8 @@ export const UsersPage: React.FC = () => {
   const handleOpenEditModal = (userToEdit: User) => {
     setSelectedUser(userToEdit);
     setEditForm({
-      role: userToEdit.role,
-      employeeId: userToEdit.employeeId || '',
+      role: normalizeRole(userToEdit.role),
+      employeeId: userToEdit.employeeId ? String(userToEdit.employeeId) : '',
       isActive: userToEdit.isActive,
       password: '',
     });
@@ -489,7 +506,8 @@ export const UsersPage: React.FC = () => {
                 </tr>
               ) : (
                 filteredUsers.map((u) => {
-                  const roleConfig = ROLE_OPTIONS.find((r) => r.value === u.role) || ROLE_OPTIONS[4];
+                  const normalized = normalizeRole(u.role);
+                  const roleConfig = ROLE_OPTIONS.find((r) => r.value === normalized) || ROLE_OPTIONS[4];
                   const isCurrent = u.id === currentAuthUser?.id;
 
                   return (
