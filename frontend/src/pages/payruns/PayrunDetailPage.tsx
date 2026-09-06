@@ -207,7 +207,7 @@ export const PayrunDetailPage: React.FC = () => {
               </button>
             )}
 
-            {(isValidated || isPaid) && hasRole('hr_payroll_manager') && (
+            {isPaid && hasRole('hr_payroll_manager') && (
               <button
                 onClick={handleSendPayslips}
                 disabled={isProcessing}

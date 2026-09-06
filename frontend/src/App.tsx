@@ -72,18 +72,25 @@ export const App: React.FC = () => {
               <Route path="users" element={<ProtectedRoute requiredRole="admin"><UsersPage /></ProtectedRoute>} />
               <Route path="employees" element={<EmployeesPage />} />
               <Route path="employees/:id" element={<EmployeeDetailPage />} />
-              <Route path="contracts" element={<ContractsPage />} />
-              <Route path="contracts/:id" element={<ContractDetailPage />} />
-              <Route path="working-schedules" element={<WorkingSchedulesPage />} />
+              {/* hr_manager+ routes */}
+              <Route path="contracts" element={<ProtectedRoute requiredRole="hr_manager"><ContractsPage /></ProtectedRoute>} />
+              <Route path="contracts/:id" element={<ProtectedRoute requiredRole="hr_manager"><ContractDetailPage /></ProtectedRoute>} />
+              <Route path="working-schedules" element={<ProtectedRoute requiredRole="hr_manager"><WorkingSchedulesPage /></ProtectedRoute>} />
+
+              {/* all authenticated users */}
               <Route path="attendance" element={<AttendancePage />} />
               <Route path="time-off" element={<TimeOffPage />} />
               <Route path="time-off/types" element={<TimeOffPage defaultTab="types" />} />
               <Route path="time-off/allocations" element={<TimeOffPage defaultTab="allocations" />} />
               <Route path="time-off/requests" element={<TimeOffPage defaultTab="requests" />} />
-              <Route path="salary-structures" element={<SalaryStructuresPage />} />
-              <Route path="salary-rules" element={<SalaryRulesPage />} />
-              <Route path="payruns" element={<PayrunsPage />} />
-              <Route path="payruns/:id" element={<PayrunDetailPage />} />
+
+              {/* hr_payroll_user+ routes */}
+              <Route path="salary-structures" element={<ProtectedRoute requiredRole="hr_payroll_user"><SalaryStructuresPage /></ProtectedRoute>} />
+              <Route path="salary-rules" element={<ProtectedRoute requiredRole="hr_payroll_user"><SalaryRulesPage /></ProtectedRoute>} />
+              <Route path="payruns" element={<ProtectedRoute requiredRole="hr_payroll_user"><PayrunsPage /></ProtectedRoute>} />
+              <Route path="payruns/:id" element={<ProtectedRoute requiredRole="hr_payroll_user"><PayrunDetailPage /></ProtectedRoute>} />
+
+              {/* all authenticated users — employees see only their own payslips (enforced by backend) */}
               <Route path="payslips" element={<PayslipsPage />} />
               <Route path="payslips/:id" element={<PayslipDetailPage />} />
             </Route>

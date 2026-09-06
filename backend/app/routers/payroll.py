@@ -110,12 +110,14 @@ def list_payslips(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if not is_hr_manager_or_above(current_user):
-        emp_id = current_employee_id(current_user)
-        if not emp_id:
-            return []
-        employee_id = emp_id
-    return svc.list_payslips(db, payrun_id, employee_id)
+    # hr_payroll_user and above can list all payslips (optionally filtered)
+    if is_hr_payroll_user_or_above(current_user):
+        return svc.list_payslips(db, payrun_id, employee_id)
+    # Everyone else (including hr_manager) can only see their own payslips
+    emp_id = current_employee_id(current_user)
+    if not emp_id:
+        return []
+    return svc.list_payslips(db, payrun_id, emp_id)
 
 @payslips_router.get("/{payslip_id}", response_model=PayslipOut)
 def get_payslip(
@@ -124,10 +126,13 @@ def get_payslip(
     current_user: User = Depends(get_current_user),
 ):
     record = svc.get_payslip(db, payslip_id)
-    if not is_hr_manager_or_above(current_user):
-        emp_id = current_employee_id(current_user)
-        if not emp_id or emp_id != record.employee_id:
-            raise HTTPException(status_code=403, detail="Insufficient permissions")
+    # hr_payroll_user and above can access any payslip
+    if is_hr_payroll_user_or_above(current_user):
+        return record
+    # Everyone else (including hr_manager) can only access their own payslip
+    emp_id = current_employee_id(current_user)
+    if not emp_id or emp_id != record.employee_id:
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
     return record
 
 @payslips_router.get("/{payslip_id}/pdf")
@@ -137,7 +142,8 @@ def download_pdf(
     current_user: User = Depends(get_current_user),
 ):
     record = svc.get_payslip(db, payslip_id)
-    if not is_hr_manager_or_above(current_user):
+    # hr_payroll_user and above can download any payslip PDF
+    if not is_hr_payroll_user_or_above(current_user):
         emp_id = current_employee_id(current_user)
         if not emp_id or emp_id != record.employee_id:
             raise HTTPException(status_code=403, detail="Insufficient permissions")
