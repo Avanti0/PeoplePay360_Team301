@@ -8,10 +8,13 @@ from app.core.dependencies import get_current_user, require_hr_manager, require_
 from app.models.user import User
 from app.schemas.time_off import (
     TimeOffTypeCreate, TimeOffTypeUpdate, TimeOffTypeOut,
-    AllocationCreate, AllocationUpdate, AllocationOut,
-    TimeOffRequestCreate, TimeOffRequestUpdate, TimeOffRequestOut,
+    AllocationCreate, AllocationUpdate, AllocationOut, AllocationPage,
+    TimeOffRequestCreate, TimeOffRequestUpdate, TimeOffRequestOut, TimeOffRequestPage,
 )
 from app.services import time_off_service
+
+ALLOWED_LIMITS = {10, 25, 50, 100}
+DEFAULT_LIMIT = 10
 
 # ---------------------------------------------------------------------
 # Time Off Types
@@ -77,18 +80,22 @@ def delete_time_off_type(
 allocations_router = APIRouter(prefix="/api/v1/allocations", tags=["allocations"])
 
 
-@allocations_router.get("", response_model=List[AllocationOut])
+@allocations_router.get("", response_model=AllocationPage)
 def list_allocations(
     employee_id: Optional[UUID] = Query(None),
+    page: int = 1,
+    limit: int = DEFAULT_LIMIT,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     if not is_hr_manager_or_above(current_user):
         emp_id = current_employee_id(current_user)
         if not emp_id:
-            return []
+            return {"items": [], "total": 0, "page": 1, "limit": DEFAULT_LIMIT, "total_pages": 1}
         employee_id = emp_id
-    return time_off_service.list_allocations(db, employee_id=employee_id)
+    if limit not in ALLOWED_LIMITS:
+        limit = DEFAULT_LIMIT
+    return time_off_service.list_allocations(db, employee_id=employee_id, page=page, limit=limit)
 
 
 @allocations_router.post("", response_model=AllocationOut)
@@ -132,19 +139,23 @@ def update_allocation(
 requests_router = APIRouter(prefix="/api/v1/time-off-requests", tags=["time-off-requests"])
 
 
-@requests_router.get("", response_model=List[TimeOffRequestOut])
+@requests_router.get("", response_model=TimeOffRequestPage)
 def list_requests(
     employee_id: Optional[UUID] = Query(None),
     status: Optional[str] = Query(None),
+    page: int = 1,
+    limit: int = DEFAULT_LIMIT,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     if not is_hr_manager_or_above(current_user):
         emp_id = current_employee_id(current_user)
         if not emp_id:
-            return []
+            return {"items": [], "total": 0, "page": 1, "limit": DEFAULT_LIMIT, "total_pages": 1}
         employee_id = emp_id
-    return time_off_service.list_requests(db, employee_id=employee_id, status_filter=status)
+    if limit not in ALLOWED_LIMITS:
+        limit = DEFAULT_LIMIT
+    return time_off_service.list_requests(db, employee_id=employee_id, status_filter=status, page=page, limit=limit)
 
 
 @requests_router.post("", response_model=TimeOffRequestOut)

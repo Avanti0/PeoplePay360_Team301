@@ -69,11 +69,25 @@ def delete_time_off_type(db: Session, type_id: UUID) -> None:
 # Allocations
 # ---------------------------------------------------------------------
 
-def list_allocations(db: Session, employee_id: Optional[UUID] = None) -> list[Allocation]:
+def list_allocations(db: Session, employee_id: Optional[UUID] = None, page: Optional[int] = None, limit: Optional[int] = None):
     query = db.query(Allocation)
     if employee_id is not None:
         query = query.filter(Allocation.employee_id == employee_id)
-    return query.order_by(Allocation.date_from.desc()).all()
+
+    # Lexicographic-by-employee ordering, consistent with the Employees list;
+    # most-recent-first within the same employee as a tiebreak.
+    query = query.join(Employee, Allocation.employee_id == Employee.id).order_by(
+        Employee.name, Allocation.date_from.desc()
+    )
+
+    if limit is None:
+        return query.all()
+
+    total = query.count()
+    page = max(1, page or 1)
+    total_pages = max(1, -(-total // limit))
+    items = query.offset((page - 1) * limit).limit(limit).all()
+    return {"items": items, "total": total, "page": page, "limit": limit, "total_pages": total_pages}
 
 
 def get_allocation(db: Session, allocation_id: UUID) -> Allocation:
@@ -134,13 +148,33 @@ def _resolve_allocation(
     )
 
 
-def list_requests(db: Session, employee_id: Optional[UUID] = None, status_filter: Optional[str] = None) -> list[TimeOffRequest]:
+def list_requests(
+    db: Session,
+    employee_id: Optional[UUID] = None,
+    status_filter: Optional[str] = None,
+    page: Optional[int] = None,
+    limit: Optional[int] = None,
+):
     query = db.query(TimeOffRequest)
     if employee_id is not None:
         query = query.filter(TimeOffRequest.employee_id == employee_id)
     if status_filter is not None:
         query = query.filter(TimeOffRequest.status == status_filter)
-    return query.order_by(TimeOffRequest.date_from.desc()).all()
+
+    # Lexicographic-by-employee ordering, consistent with the Employees list;
+    # most-recent-first within the same employee as a tiebreak.
+    query = query.join(Employee, TimeOffRequest.employee_id == Employee.id).order_by(
+        Employee.name, TimeOffRequest.date_from.desc()
+    )
+
+    if limit is None:
+        return query.all()
+
+    total = query.count()
+    page = max(1, page or 1)
+    total_pages = max(1, -(-total // limit))
+    items = query.offset((page - 1) * limit).limit(limit).all()
+    return {"items": items, "total": total, "page": page, "limit": limit, "total_pages": total_pages}
 
 
 def get_request(db: Session, request_id: UUID) -> TimeOffRequest:

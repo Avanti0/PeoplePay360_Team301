@@ -183,7 +183,7 @@ def test_employee_sees_only_own_time_off_requests(db: Session):
     user_a.role = "employee"
 
     results = router_list_requests(employee_id=emp_b.id, status=None, db=db, current_user=user_a)
-    for r in results:
+    for r in results["items"]:
         assert r.employee_id == emp_a.id
 
 
@@ -197,7 +197,7 @@ def test_employee_sees_only_own_allocations(db: Session):
     user_a.role = "employee"
 
     results = router_list_allocations(employee_id=emp_b.id, db=db, current_user=user_a)
-    for a in results:
+    for a in results["items"]:
         assert a.employee_id == emp_a.id
 
 
