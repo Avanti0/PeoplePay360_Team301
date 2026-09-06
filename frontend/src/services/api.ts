@@ -23,7 +23,8 @@ import {
   BulkContractCreateData,
   BulkContractUpdateData,
   BulkContractDeleteData,
-  BulkOperationResult
+  BulkOperationResult,
+  EmployeeDashboardData
 } from '../types';
 import {
   initialEmployees,
@@ -1625,6 +1626,7 @@ export const api = {
   },
 
   dashboard: {
+    getEmployeeDashboard: () => request<EmployeeDashboardData>('/dashboard/me'),
     getKpis: () => request<DashboardKPIs>('/dashboard/kpis'),
     getSalaryByDept: () => request<DepartmentSalaryCost[]>('/dashboard/salary-by-dept'),
     getSalaryTrend: () => request<MonthlySalaryTrend[]>('/dashboard/salary-trend'),

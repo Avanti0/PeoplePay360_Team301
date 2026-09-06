@@ -1,6 +1,6 @@
 from datetime import date, datetime, timezone
 from decimal import Decimal
-from typing import Optional
+from typing import Optional, Any
 from uuid import UUID
 from fastapi import HTTPException, status
 from sqlalchemy import func
@@ -35,7 +35,7 @@ def list_attendance(
     date_to: Optional[date] = None,
     page: Optional[int] = None,
     limit: Optional[int] = None,
-):
+) -> Any:
     query = _with_employee_schedule(db.query(Attendance))
     if employee_id is not None:
         query = query.filter(Attendance.employee_id == employee_id)

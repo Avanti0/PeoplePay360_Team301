@@ -76,6 +76,11 @@ export const EmployeeDetailPage: React.FC = () => {
   const loadEmployeeDetails = async (empId: string) => {
     setIsLoading(true);
     try {
+      if (!isHR && user?.employeeId && String(empId) !== String(user.employeeId)) {
+        error('Access denied: You can only view your own employee profile');
+        navigate('/dashboard');
+        return;
+      }
       const [emp, contractList, toList] = await Promise.all([
         api.employees.getById(empId),
         isHR ? api.employees.getContracts(empId).catch(() => []) : Promise.resolve([]),

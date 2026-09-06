@@ -25,8 +25,8 @@ def list_employees(
     employment_status: Optional[EmploymentStatus] = Query(None),
     status: Optional[str] = Query(None, description="active | inactive | all (alias used by frontend)"),
     search: Optional[str] = Query(None, description="matches employee name or email"),
-    page: int = 1,
-    limit: int = DEFAULT_LIMIT,
+    page: int = Query(1),
+    limit: int = Query(DEFAULT_LIMIT),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):

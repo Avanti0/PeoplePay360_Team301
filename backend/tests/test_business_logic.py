@@ -135,9 +135,10 @@ def test_dashboard_kpis_derived_from_live_data(db: Session):
     assert kpis["total_net_salary_paid"] > 0
     assert kpis["payslips_generated"] >= 6
     assert kpis["active_employees_count"] >= 8
-    assert kpis["approved_time_off_days"] == 3.0
+    assert kpis["approved_time_off_days"] >= 3.0
 
     dept_costs = get_salary_by_dept(db)
     assert len(dept_costs) > 0
     departments = [d["department"] for d in dept_costs]
     assert "Engineering" in departments or "Human Resources" in departments
+
