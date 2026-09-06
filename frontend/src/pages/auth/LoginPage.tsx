@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, Navigate, Link } from 'react-router-dom';
+import { useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import {
@@ -13,7 +13,6 @@ import {
   AlertCircle,
   HelpCircle,
   X,
-  UserPlus,
 } from 'lucide-react';
 
 export const LoginPage: React.FC = () => {
@@ -96,18 +95,9 @@ export const LoginPage: React.FC = () => {
 
         {/* Card */}
         <div className="bg-white rounded-3xl p-8 shadow-2xl border border-slate-100">
-          <div className="flex items-center justify-between pb-4 mb-5 border-b border-slate-100">
-            <div>
-              <h3 className="text-lg font-bold text-slate-900">Sign In</h3>
-              <p className="text-xs text-slate-500">Access your organization workspace</p>
-            </div>
-            <Link
-              to="/signup"
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors"
-            >
-              <UserPlus className="w-3.5 h-3.5" />
-              <span>Create Account</span>
-            </Link>
+          <div className="pb-4 mb-5 border-b border-slate-100">
+            <h3 className="text-lg font-bold text-slate-900">Sign In</h3>
+            <p className="text-xs text-slate-500">Access your organization workspace</p>
           </div>
 
           {formError && (
@@ -217,19 +207,6 @@ export const LoginPage: React.FC = () => {
               )}
             </button>
           </form>
-
-          {/* Sign Up Redirect */}
-          <div className="mt-6 pt-4 border-t border-slate-100 text-center">
-            <p className="text-xs text-slate-500">
-              Don't have an account yet?{' '}
-              <Link
-                to="/signup"
-                className="text-blue-600 hover:text-blue-700 font-bold hover:underline"
-              >
-                Sign Up
-              </Link>
-            </p>
-          </div>
         </div>
 
         {/* Security Notice */}

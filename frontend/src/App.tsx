@@ -56,7 +56,7 @@ export const App: React.FC = () => {
         <BrowserRouter>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
-            <Route path="/signup" element={<SignUpPage />} />
+            <Route path="/signup" element={<Navigate to="/login" replace />} />
             <Route path="/unauthorized" element={<UnauthorizedPage />} />
 
             <Route
